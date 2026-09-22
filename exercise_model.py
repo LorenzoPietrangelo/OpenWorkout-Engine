@@ -24,6 +24,8 @@ class Esercizio:
     nome: str
     muscoli_primari: list[Muscolo]
     categoria: Categoria
+    tempo_riscaldamento: int
+    tempo_serie: int
     muscoli_secondari: list[Muscolo] = field(default_factory=list)
     monolaterale: bool = False
 

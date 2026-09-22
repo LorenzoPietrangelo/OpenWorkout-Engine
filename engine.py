@@ -1,10 +1,15 @@
 
+from collections import Counter
 from itertools import combinations
 from exercise_model import Esercizio, Categoria, Muscolo
 from execises import esercizi
 
 MIN_REST = 2
 TOP_SLOT = 4
+
+RISCALDAMENTO_GENERALE = 10
+RECUPERO = {Categoria.COMPOUND_GAMBE: (3, 5)}  # (min, max) in minuti
+RECUPERO_DEFAULT = (2, 4)
 
 
 #insieme di metodi che generano la seettimana con i muscoli ordianti
@@ -81,4 +86,57 @@ def assegna_esercizi(week, priorita, esercizi):
         risultato[giorno] = workout
     return risultato
 
+#insieme dei metodi che regolano il numero di serie per esercizio
 
+def recupero(e):
+    minimo, massimo = RECUPERO.get(e.categoria, RECUPERO_DEFAULT)
+    return (minimo + massimo) / 2
+
+def tempo_serie(e):
+    return e.tempo_serie + recupero(e)
+
+def durata(workout, serie):
+    return RISCALDAMENTO_GENERALE + sum(
+        e.tempo_riscaldamento + s * tempo_serie(e) for e, s in zip(workout, serie))
+
+def durata_con_serie(workout):
+    return durata([e for e, _ in workout], [s for _, s in workout]) if workout else 0
+
+def eccesso(workout, max_minuti):
+    return durata(workout, [1] * len(workout)) - max_minuti
+
+def indice_tagliabile(workout, istanze):
+    return next((i for i in range(len(workout) - 1, -1, -1)
+                 if istanze[workout[i].nome] >= 3), None)
+
+def giorno_peggiore(scheda, istanze, max_minuti):
+    candidati = [g for g, w in scheda.items()
+                 if eccesso(w, max_minuti) > 0 and indice_tagliabile(w, istanze) is not None]
+    return max(candidati, key=lambda g: eccesso(scheda[g], max_minuti), default=None)
+
+def taglia_workout(scheda, max_minuti):
+    scheda = {g: list(w) for g, w in scheda.items()}
+    istanze = Counter(e.nome for w in scheda.values() for e in w)
+    while (g := giorno_peggiore(scheda, istanze, max_minuti)) is not None:
+        i = indice_tagliabile(scheda[g], istanze)
+        istanze[scheda[g][i].nome] -= 1
+        scheda[g].pop(i)
+    return scheda
+
+def aggiungi_serie(workout, max_minuti):
+    serie = [1] * len(workout)
+    while workout:
+        for i, e in enumerate(workout):
+            if durata(workout, serie) + tempo_serie(e) > max_minuti:
+                return list(zip(workout, serie))
+            serie[i] += 1
+    return []
+
+def calcola_serie(scheda, max_minuti):
+    scheda = taglia_workout(scheda, max_minuti)
+    for g, w in scheda.items():
+        minimo = durata(w, [1] * len(w))
+        if minimo > max_minuti:
+            print(f"Attenzione: il giorno {g} dura almeno {minimo} min, "
+                  f"non è possibile rispettare il limite di {max_minuti} min.")
+    return {g: aggiungi_serie(w, max_minuti) for g, w in scheda.items()}
