@@ -1,4 +1,5 @@
 
+import csv
 from collections import Counter
 from itertools import combinations
 from exercise_model import Esercizio, Categoria, Muscolo
@@ -10,6 +11,11 @@ TOP_SLOT = 4
 RISCALDAMENTO_GENERALE = 10
 RECUPERO = {Categoria.COMPOUND_GAMBE: (3, 5)}  # (min, max) in minuti
 RECUPERO_DEFAULT = (2, 4)
+
+RIPETIZIONI = {Categoria.COMPOUND_GAMBE: (8, 10)}  # (min, max)
+RIPETIZIONI_DEFAULT = (6, 8)
+
+INTESTAZIONE = ["esercizio", "serie", "ripetizioni", "recupero"]
 
 
 #insieme di metodi che generano la seettimana con i muscoli ordianti
@@ -26,12 +32,16 @@ def best_combo(days, n, week):
 def depths(combo, week):
     return sorted(len(week[g]) for g in combo)
 
+def coppia_preferibile(c2, c3, week):
+    confronti = list(zip(depths(c2, week), depths(c3, week)))
+    return all(a <= b for a, b in confronti) and any(a < b for a, b in confronti)
+
 def build_week(days, muscles):
     week = {g: [] for g in days}
     for m in muscles:
         c3, c2 = best_combo(days, 3, week), best_combo(days, 2, week)
         combo = c3 or c2
-        if c3 and c2 and all(a < b for a, b in zip(depths(c2, week), depths(c3, week))):
+        if c3 and c2 and coppia_preferibile(c2, c3, week):
             combo = c2
         for g in combo or []:
             week[g].append(m)
@@ -140,3 +150,39 @@ def calcola_serie(scheda, max_minuti):
             print(f"Attenzione: il giorno {g} dura almeno {minimo} min, "
                   f"non è possibile rispettare il limite di {max_minuti} min.")
     return {g: aggiungi_serie(w, max_minuti) for g, w in scheda.items()}
+
+#insieme dei metodi che completano la scheda e producono il file .csv
+
+def ripetizioni(e):
+    minimo, massimo = RIPETIZIONI.get(e.categoria, RIPETIZIONI_DEFAULT)
+    return f"{minimo}|{massimo}"
+
+def recupero_testo(e):
+    minimo, massimo = RECUPERO.get(e.categoria, RECUPERO_DEFAULT)
+    return f"{minimo}|{massimo} min"
+
+def riga_esercizio(e, serie):
+    return [e.nome, serie, ripetizioni(e), recupero_testo(e)]
+
+def tabella_workout(numero, workout):
+    return [[f"workout {numero}", "", "", ""],
+            INTESTAZIONE,
+            *(riga_esercizio(e, s) for e, s in workout)]
+
+def separatore(giorno_precedente, giorno):
+    return [[], ["REST DAY"], []] if giorno - giorno_precedente > 1 else [[]]
+
+def righe_scheda(scheda):
+    giorni = sorted(scheda)
+    righe = []
+    for numero, giorno in enumerate(giorni, start=1):
+        if numero > 1:
+            righe += separatore(giorni[numero - 2], giorno)
+        righe += tabella_workout(numero, scheda[giorno])
+    return righe
+
+def scrivi_csv(scheda, percorso="scheda.csv"):
+    with open(percorso, "w", newline="", encoding="utf-8") as f:
+        csv.writer(f).writerows(righe_scheda(scheda))
+    return percorso
+

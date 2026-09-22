@@ -1,11 +1,11 @@
-from engine import build_week, assegna_esercizi, calcola_serie, durata_con_serie
+from engine import build_week, assegna_esercizi, calcola_serie, durata_con_serie, scrivi_csv
 from execises import esercizi
 
 from exercise_model import Muscolo
 
 if __name__ == "__main__":
 
-    days_selected=[1,3,5]
+    days_selected=[1,2,4,5,6]
     muscle_priority = [
     Muscolo.CHEST,
     Muscolo.LATS,
@@ -17,7 +17,7 @@ if __name__ == "__main__":
     Muscolo.BICEPS,
     Muscolo.GLUTES,
     Muscolo.ADDUCTORS]
-    max_minuti = 20  # tempo massimo per allenamento in minuti
+    max_minuti = 120  # tempo massimo per allenamento in minuti
     week = build_week(days_selected, muscle_priority)
     scheda = assegna_esercizi(week, muscle_priority, esercizi)
     scheda_con_serie = calcola_serie(scheda, max_minuti)                 # 3. numero di serie
@@ -37,3 +37,7 @@ if __name__ == "__main__":
     for day, workout in scheda_con_serie.items():
         print(f"Giorno {day} ({durata_con_serie(workout):.0f} min):",
               ", ".join(f"{e.nome} x{s}" for e, s in workout))
+
+    print("--------------------------------------------------------------------------------")
+
+    print("Scheda salvata in:", scrivi_csv(scheda_con_serie))
