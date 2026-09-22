@@ -1,8 +1,13 @@
 
 from itertools import combinations
+from exercise_model import Esercizio, Categoria, Muscolo
+from execises import esercizi
 
 MIN_REST = 2
+TOP_SLOT = 4
 
+
+#insieme di metodi che generano la seettimana con i muscoli ordianti
 def valid_combos(days, n):
     return [c for c in combinations(sorted(days), n)
             if all(b - a >= MIN_REST for a, b in zip(c, c[1:]))
@@ -28,10 +33,52 @@ def build_week(days, muscles):
     return week
 
 
-days_selected=[1,2,5]
-muscle_priority=["Chest","Lats","upper back","Quads","Hamstrings",
-                "side delts","Triceps","Biceps","glutes","adduttori"]
+#insieme di metodi che costruisocno la scheda sostitunedo i muscoli con esercizi
+def esercizio_per(muscolo, esercizi):
+    return next((e for e in esercizi if muscolo in e.muscoli_primari), None)
 
-for day, muscles in build_week(days_selected, muscle_priority).items():
-    print(day, muscles)
+def isolamento_per(muscolo, esercizi):
+    return next((e for e in esercizi if e.muscoli_primari == [muscolo]), None)
+
+def compound_glutei_adduttori(secondario, esercizi):
+    return next((e for e in esercizi
+                 if set(e.muscoli_primari) == {Muscolo.GLUTES, Muscolo.ADDUCTORS}
+                 and secondario in e.muscoli_secondari), None)
+
+def scegli_secondario(giorno, week, priorita):
+    oggi = week[giorno]
+    domani = week.get(giorno % 7 + 1, [])
+    presenti = [m for m in (Muscolo.QUADS, Muscolo.HAMSTRINGS) if m in oggi]
+    if presenti:
+        return max(presenti, key=oggi.index)
+    ordinati = sorted((Muscolo.QUADS, Muscolo.HAMSTRINGS),
+                      key=lambda m: priorita.index(m) if m in priorita else len(priorita))
+    liberi = [m for m in ordinati if m not in domani]
+    return liberi[0] if liberi else None
+
+def assegna_esercizi(week, priorita, esercizi):
+    gambe_speciali = (Muscolo.GLUTES, Muscolo.ADDUCTORS)
+    base = {m: esercizio_per(m, esercizi) for m in priorita if m not in gambe_speciali}
+    risultato = {}
+    for giorno, muscoli in week.items():
+        compound, slot = None, None
+        if all(m in muscoli for m in gambe_speciali):
+            i_g, i_a = muscoli.index(Muscolo.GLUTES), muscoli.index(Muscolo.ADDUCTORS)
+            if min(i_g, i_a) >= TOP_SLOT:
+                secondario = scegli_secondario(giorno, week, priorita)
+                if secondario:
+                    compound = compound_glutei_adduttori(secondario, esercizi)
+                    slot = max(i_g, i_a)
+        workout = []
+        for i, m in enumerate(muscoli):
+            if m in gambe_speciali:
+                if compound is None:
+                    workout.append(isolamento_per(m, esercizi))
+                elif i == slot:
+                    workout.append(compound)
+            else:
+                workout.append(base[m])
+        risultato[giorno] = workout
+    return risultato
+
 
