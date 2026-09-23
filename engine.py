@@ -2,7 +2,7 @@
 import csv
 from collections import Counter
 from itertools import combinations
-from exercise_model import Esercizio, Categoria, Muscolo
+from exercise_model import Esercizio, Categoria, Muscolo, Attrezzo, MuscoloScoperto
 from execises import esercizi
 
 MIN_REST = 2
@@ -49,16 +49,25 @@ def build_week(days, muscles):
 
 
 #insieme di metodi che costruisocno la scheda sostitunedo i muscoli con esercizi
-def esercizio_per(muscolo, esercizi):
-    return next((e for e in esercizi if muscolo in e.muscoli_primari), None)
+def scoperto(e):
+    return isinstance(e, MuscoloScoperto)
 
-def isolamento_per(muscolo, esercizi):
-    return next((e for e in esercizi if e.muscoli_primari == [muscolo]), None)
+def eseguibile(e, attrezzi):
+    return attrezzi is None or set(e.attrezzi) <= set(attrezzi)
 
-def compound_glutei_adduttori(secondario, esercizi):
+def esercizio_per(muscolo, esercizi, attrezzi=None):
+    return next((e for e in esercizi
+                 if muscolo in e.muscoli_primari and eseguibile(e, attrezzi)), None)
+
+def isolamento_per(muscolo, esercizi, attrezzi=None):
+    return next((e for e in esercizi
+                 if e.muscoli_primari == [muscolo] and eseguibile(e, attrezzi)), None)
+
+def compound_glutei_adduttori(secondario, esercizi, attrezzi=None):
     return next((e for e in esercizi
                  if set(e.muscoli_primari) == {Muscolo.GLUTES, Muscolo.ADDUCTORS}
-                 and secondario in e.muscoli_secondari), None)
+                 and secondario in e.muscoli_secondari
+                 and eseguibile(e, attrezzi)), None)
 
 def scegli_secondario(giorno, week, priorita):
     oggi = week[giorno]
@@ -71,9 +80,13 @@ def scegli_secondario(giorno, week, priorita):
     liberi = [m for m in ordinati if m not in domani]
     return liberi[0] if liberi else None
 
-def assegna_esercizi(week, priorita, esercizi):
+def oppure_scoperto(e, muscolo):
+    return MuscoloScoperto(muscolo) if e is None else e
+
+def assegna_esercizi(week, priorita, esercizi, attrezzi=None):
     gambe_speciali = (Muscolo.GLUTES, Muscolo.ADDUCTORS)
-    base = {m: esercizio_per(m, esercizi) for m in priorita if m not in gambe_speciali}
+    base = {m: esercizio_per(m, esercizi, attrezzi)
+            for m in priorita if m not in gambe_speciali}
     risultato = {}
     for giorno, muscoli in week.items():
         compound, slot = None, None
@@ -82,17 +95,17 @@ def assegna_esercizi(week, priorita, esercizi):
             if min(i_g, i_a) >= TOP_SLOT:
                 secondario = scegli_secondario(giorno, week, priorita)
                 if secondario:
-                    compound = compound_glutei_adduttori(secondario, esercizi)
+                    compound = compound_glutei_adduttori(secondario, esercizi, attrezzi)
                     slot = max(i_g, i_a)
         workout = []
         for i, m in enumerate(muscoli):
             if m in gambe_speciali:
                 if compound is None:
-                    workout.append(isolamento_per(m, esercizi))
+                    workout.append(oppure_scoperto(isolamento_per(m, esercizi, attrezzi), m))
                 elif i == slot:
                     workout.append(compound)
             else:
-                workout.append(base[m])
+                workout.append(oppure_scoperto(base[m], m))
         risultato[giorno] = workout
     return risultato
 
@@ -103,7 +116,7 @@ def recupero(e):
     return (minimo + massimo) / 2
 
 def tempo_serie(e):
-    return e.tempo_serie + recupero(e)
+    return 0 if scoperto(e) else e.tempo_serie + recupero(e)
 
 def durata(workout, serie):
     return RISCALDAMENTO_GENERALE + sum(
@@ -117,7 +130,7 @@ def eccesso(workout, max_minuti):
 
 def indice_tagliabile(workout, istanze):
     return next((i for i in range(len(workout) - 1, -1, -1)
-                 if istanze[workout[i].nome] >= 3), None)
+                 if not scoperto(workout[i]) and istanze[workout[i].nome] >= 3), None)
 
 def giorno_peggiore(scheda, istanze, max_minuti):
     candidati = [g for g, w in scheda.items()
@@ -134,13 +147,14 @@ def taglia_workout(scheda, max_minuti):
     return scheda
 
 def aggiungi_serie(workout, max_minuti):
-    serie = [1] * len(workout)
-    while workout:
-        for i, e in enumerate(workout):
-            if durata(workout, serie) + tempo_serie(e) > max_minuti:
+    serie = [0 if scoperto(e) else 1 for e in workout]
+    reali = [i for i, e in enumerate(workout) if not scoperto(e)]
+    while reali:
+        for i in reali:
+            if durata(workout, serie) + tempo_serie(workout[i]) > max_minuti:
                 return list(zip(workout, serie))
             serie[i] += 1
-    return []
+    return list(zip(workout, serie))
 
 def calcola_serie(scheda, max_minuti):
     scheda = taglia_workout(scheda, max_minuti)
@@ -162,6 +176,8 @@ def recupero_testo(e):
     return f"{minimo}|{massimo} min"
 
 def riga_esercizio(e, serie):
+    if scoperto(e):
+        return [e.nome, "", "", ""]
     return [e.nome, serie, ripetizioni(e), recupero_testo(e)]
 
 def tabella_workout(numero, workout):
