@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OpenWorkout Engine</title>
+  <meta name="description" content="Genera gratis una scheda di allenamento personalizzata.">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="hero">
+    <h1>OpenWorkout Engine</h1>
+    <p>Tutti hanno diritto ad allenarsi bene. Inserisci i tuoi dati e ottieni una scheda personalizzata.</p>
+  </header>
+
+  <main>
+    <form id="form" class="card" novalidate>
+      <section>
+        <h2>1. Giorni di allenamento</h2>
+        <div id="giorni" class="chips"></div>
+      </section>
+
+      <section>
+        <h2>2. Durata massima</h2>
+        <label class="inline">
+          <input id="max-minuti" type="number" min="1" max="300" value="60" required>
+          <span>minuti per allenamento</span>
+        </label>
+      </section>
+
+      <section>
+        <h2>3. Priorità muscolare</h2>
+        <p class="hint">Ordina i muscoli dal più importante al meno importante. Togli la spunta a quelli che non vuoi allenare.</p>
+        <ol id="muscoli" class="priorita"></ol>
+      </section>
+
+      <section>
+        <h2>4. Attrezzatura</h2>
+        <label class="inline">
+          <input id="tutti-attrezzi" type="checkbox" checked>
+          <span>Ho a disposizione una palestra completa</span>
+        </label>
+        <div id="attrezzi" class="chips" hidden></div>
+      </section>
+
+      <div id="errore" class="avviso errore" hidden></div>
+
+      <button id="genera" type="submit" class="primario">Genera scheda</button>
+    </form>
+
+    <section id="risultato" hidden>
+      <div class="barra-risultato">
+        <h2>La tua scheda</h2>
+        <button id="scarica-csv" type="button" class="secondario">Scarica CSV</button>
+      </div>
+      <div id="avvisi"></div>
+      <div id="settimana" class="settimana"></div>
+    </section>
+  </main>
+
+  <footer>
+    <a href="/docs">Documentazione API</a>
+    ·
+    <a href="https://github.com/LorenzoPietrangelo/OpenWorkout-Engine">Codice sorgente</a>
+  </footer>
+
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -10,3 +10,6 @@ app = FastAPI(
 
 app.include_router(catalogo.router)
 app.include_router(scheda.router)
+
+# pagina web; le rotte dell'api hanno sempre la precedenza
+app.frontend("/", directory="frontend")
