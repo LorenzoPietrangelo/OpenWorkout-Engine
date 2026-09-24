@@ -92,8 +92,28 @@ function sposta(i, delta, rimettiFocus = false) {
   if (j < 0 || j >= stato.muscoli.length) return;
   [stato.muscoli[i], stato.muscoli[j]] = [stato.muscoli[j], stato.muscoli[i]];
   stato.muscoli = compatta(stato.muscoli);
-  disegnaMuscoli();
+  ridisegnaMuscoliAnimato();
   if (rimettiFocus) $("muscoli").children[j]?.querySelector(".maniglia")?.focus();
+}
+
+const movimentoRidotto = matchMedia("(prefers-reduced-motion: reduce)");
+
+// fa scivolare el da dove si vedeva (daTop) a dove si trova ora, invece di farlo saltare
+function scivola(el, daTop) {
+  if (movimentoRidotto.matches) return;
+  el.getAnimations().forEach((a) => a.cancel());
+  const dy = daTop - el.getBoundingClientRect().top;
+  if (dy) el.animate([{ transform: `translateY(${dy}px)` }, { transform: "none" }],
+                     { duration: 160, easing: "ease-out" });
+}
+
+function ridisegnaMuscoliAnimato() {
+  const prima = new Map([...$("muscoli").children]
+    .map((el) => [el.dataset.muscolo, el.getBoundingClientRect().top]));
+  disegnaMuscoli();
+  for (const el of $("muscoli").children) {
+    if (prima.has(el.dataset.muscolo)) scivola(el, prima.get(el.dataset.muscolo));
+  }
 }
 
 // drag & drop con pointer events: funziona con mouse, touch e penna
@@ -103,30 +123,37 @@ function iniziaTrascinamento(evento, li) {
   const maniglia = evento.currentTarget;
   const lista = li.parentElement;
   maniglia.setPointerCapture(evento.pointerId);
+  li.getAnimations().forEach((a) => a.cancel());
   li.classList.add("trascinato");
+
+  // attivi ed esclusi restano separati, così al rilascio il muscolo non salta altrove
+  const stessoGruppo = (el) => el?.classList.contains("escluso") === li.classList.contains("escluso");
 
   let ultimaY = evento.clientY;
   let scostamento = 0;
 
   // si sposta sempre il vicino, mai li: togliere dal DOM l'elemento trascinato
   // fa perdere il pointer capture e il trascinamento si blocca
-  const scambia = (giu) => {
+  const scambia = (vicino, giu) => {
     const primaTop = li.offsetTop;
-    if (giu) lista.insertBefore(li.nextElementSibling, li);
-    else lista.insertBefore(li.previousElementSibling, li.nextElementSibling);
+    const vicinoDa = vicino.getBoundingClientRect().top;
+    lista.insertBefore(vicino, giu ? li : li.nextElementSibling);
     scostamento -= li.offsetTop - primaTop;
+    scivola(vicino, vicinoDa);
+    const [a, b] = [li, vicino].map((el) => el.querySelector(".rango"));
+    [a.textContent, b.textContent] = [b.textContent, a.textContent];
   };
 
   const muovi = (e) => {
     scostamento += e.clientY - ultimaY;
     ultimaY = e.clientY;
     let succ, prec;
-    while ((succ = li.nextElementSibling) && scostamento > succ.offsetHeight / 2) scambia(true);
-    while ((prec = li.previousElementSibling) && scostamento < -prec.offsetHeight / 2) scambia(false);
-    // in cima o in fondo non segue il puntatore oltre il bordo, così resta dentro la lista
+    while (stessoGruppo(succ = li.nextElementSibling) && scostamento > succ.offsetHeight / 2) scambia(succ, true);
+    while (stessoGruppo(prec = li.previousElementSibling) && scostamento < -prec.offsetHeight / 2) scambia(prec, false);
+    // ai bordi del gruppo non segue il puntatore oltre, così resta dentro la lista
     let visibile = scostamento;
-    if (!li.previousElementSibling) visibile = Math.max(visibile, 0);
-    if (!li.nextElementSibling) visibile = Math.min(visibile, 0);
+    if (!stessoGruppo(li.previousElementSibling)) visibile = Math.max(visibile, 0);
+    if (!stessoGruppo(li.nextElementSibling)) visibile = Math.min(visibile, 0);
     li.style.transform = `translateY(${visibile}px)`;
   };
 
@@ -136,7 +163,7 @@ function iniziaTrascinamento(evento, li) {
     maniglia.removeEventListener("pointercancel", fine);
     const nuovoOrdine = [...lista.children].map((el) => stato.muscoli[Number(el.dataset.indice)]);
     stato.muscoli = compatta(nuovoOrdine);
-    disegnaMuscoli();
+    ridisegnaMuscoliAnimato();
   };
 
   maniglia.addEventListener("pointermove", muovi);
@@ -162,6 +189,7 @@ function disegnaMuscoli() {
     const li = document.createElement("li");
     li.classList.toggle("escluso", !m.attivo);
     li.dataset.indice = i;
+    li.dataset.muscolo = m.valore;
 
     const maniglia = document.createElement("span");
     maniglia.className = "maniglia";
@@ -186,7 +214,7 @@ function disegnaMuscoli() {
     spunta.addEventListener("change", () => {
       m.attivo = spunta.checked;
       stato.muscoli = compatta(stato.muscoli);
-      disegnaMuscoli();
+      ridisegnaMuscoliAnimato();
     });
 
     const nome = document.createElement("span");

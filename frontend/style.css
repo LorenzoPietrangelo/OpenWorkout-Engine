@@ -94,6 +94,7 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent);
   padding: 6px 4px;
   border-bottom: 1px solid var(--border);
   border-radius: 6px;
+  transition: box-shadow 0.15s ease-out; /* niente transition sul transform: la gestisce il trascinamento */
 }
 .priorita li:last-child { border-bottom: none; }
 .priorita li:hover { background: var(--soft); }
