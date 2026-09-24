@@ -108,10 +108,12 @@ function iniziaTrascinamento(evento, li) {
   let ultimaY = evento.clientY;
   let scostamento = 0;
 
+  // si sposta sempre il vicino, mai li: togliere dal DOM l'elemento trascinato
+  // fa perdere il pointer capture e il trascinamento si blocca
   const scambia = (giu) => {
     const primaTop = li.offsetTop;
     if (giu) lista.insertBefore(li.nextElementSibling, li);
-    else lista.insertBefore(li, li.previousElementSibling);
+    else lista.insertBefore(li.previousElementSibling, li.nextElementSibling);
     scostamento -= li.offsetTop - primaTop;
   };
 
@@ -121,7 +123,11 @@ function iniziaTrascinamento(evento, li) {
     let succ, prec;
     while ((succ = li.nextElementSibling) && scostamento > succ.offsetHeight / 2) scambia(true);
     while ((prec = li.previousElementSibling) && scostamento < -prec.offsetHeight / 2) scambia(false);
-    li.style.transform = `translateY(${scostamento}px)`;
+    // in cima o in fondo non segue il puntatore oltre il bordo, così resta dentro la lista
+    let visibile = scostamento;
+    if (!li.previousElementSibling) visibile = Math.max(visibile, 0);
+    if (!li.nextElementSibling) visibile = Math.min(visibile, 0);
+    li.style.transform = `translateY(${visibile}px)`;
   };
 
   const fine = () => {
