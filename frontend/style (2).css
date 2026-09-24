@@ -1,9 +1,10 @@
 :root {
-  --bg: #f6f7f9;
+  --bg: #ffffff;
+  --soft: #f5f7fa;   /* grigio appena percettibile per hover e selezioni */
   --card: #ffffff;
   --text: #1c1f24;
   --muted: #5f6672;
-  --border: #dde1e7;
+  --border: #e9ecf0;
   --accent: #2f6fed;
   --accent-text: #ffffff;
   --accent-soft: #e6eeff;
@@ -12,23 +13,7 @@
   --error-bg: #fde8e8;
   --error-text: #9b1c1c;
   --radius: 12px;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #111418;
-    --card: #1a1e24;
-    --text: #e8eaed;
-    --muted: #9aa1ad;
-    --border: #2c323b;
-    --accent: #6b9bff;
-    --accent-text: #0b1020;
-    --accent-soft: #1e2a44;
-    --warn-bg: #3a2c10;
-    --warn-text: #ffd48a;
-    --error-bg: #3d1a1a;
-    --error-text: #ffb4b4;
-  }
+  color-scheme: light; /* checkbox e input restano chiari anche se il sistema è in modalità scura */
 }
 
 * { box-sizing: border-box; }
@@ -59,6 +44,7 @@ h2 { font-size: 1.1rem; margin: 0 0 12px; }
   border-radius: var(--radius);
   padding: 20px;
 }
+form.card { border: none; padding: 20px 0; }
 
 form section + section { margin-top: 28px; }
 
@@ -71,7 +57,7 @@ input[type="number"] {
   padding: 8px 10px;
   font: inherit;
   color: var(--text);
-  background: var(--bg);
+  background: var(--card);
   border: 1px solid var(--border);
   border-radius: 8px;
 }
@@ -84,45 +70,37 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent);
 #attrezzi { margin-top: 12px; }
 
 .chip {
-  padding: 8px 14px;
+  padding: 7px 14px;
   font: inherit;
-  color: var(--text);
-  background: var(--bg);
+  color: var(--muted);
+  background: transparent;
   border: 1px solid var(--border);
   border-radius: 999px;
   cursor: pointer;
 }
 .chip[aria-pressed="true"] {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-text);
+  background: var(--accent-soft);
+  border-color: transparent;
+  color: var(--accent);
+  font-weight: 500;
 }
 
 /* lista priorità muscoli */
-.priorita { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.priorita { list-style: none; margin: 0; padding: 0; }
 .priorita li {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 10px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--border);
+  border-radius: 6px;
 }
+.priorita li:last-child { border-bottom: none; }
+.priorita li:hover { background: var(--soft); }
 .priorita li.escluso .nome-muscolo { color: var(--muted); text-decoration: line-through; }
 .priorita .rango { width: 24px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .priorita .nome-muscolo { flex: 1; }
-.priorita .sposta {
-  width: 32px;
-  height: 32px;
-  font: inherit;
-  color: var(--text);
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  cursor: pointer;
-}
-.priorita .sposta:disabled { opacity: 0.35; cursor: default; }
+.priorita .sposta { display: none; } /* sostituiti dal trascinamento e dalle frecce da tastiera */
 
 /* pulsanti */
 .primario, .secondario {
@@ -142,8 +120,8 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent);
 .primario:disabled { opacity: 0.6; cursor: progress; }
 .secondario {
   padding: 8px 14px;
-  background: var(--accent-soft);
-  color: var(--text);
+  background: transparent;
+  color: var(--accent);
   border: 1px solid var(--border);
 }
 
@@ -184,3 +162,26 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent);
 
 footer { padding-top: 40px; padding-bottom: 40px; color: var(--muted); font-size: 0.9rem; text-align: center; }
 footer a { color: var(--accent); }
+
+/* drag & drop della lista priorità */
+.priorita .maniglia {
+  padding: 4px 2px;
+  color: var(--muted);
+  opacity: 0.5;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: grab;
+  user-select: none;
+  touch-action: none; /* indispensabile su mobile: evita che il dito scrolli la pagina */
+  border-radius: 4px;
+}
+.priorita li:hover .maniglia, .priorita .maniglia:focus-visible { opacity: 1; }
+.priorita .maniglia:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.priorita li.trascinato {
+  position: relative;
+  z-index: 1;
+  background: var(--card);
+  border-bottom-color: transparent;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+.priorita li.trascinato .maniglia { cursor: grabbing; }

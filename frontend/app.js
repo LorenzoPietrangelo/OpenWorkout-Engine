@@ -82,10 +82,60 @@ function disegnaGiorni() {
   }));
 }
 
-function sposta(i, delta) {
+// tiene sempre i muscoli attivi in cima e quelli esclusi in fondo
+function compatta(lista) {
+  return [...lista.filter((m) => m.attivo), ...lista.filter((m) => !m.attivo)];
+}
+
+function sposta(i, delta, rimettiFocus = false) {
   const j = i + delta;
+  if (j < 0 || j >= stato.muscoli.length) return;
   [stato.muscoli[i], stato.muscoli[j]] = [stato.muscoli[j], stato.muscoli[i]];
+  stato.muscoli = compatta(stato.muscoli);
   disegnaMuscoli();
+  if (rimettiFocus) $("muscoli").children[j]?.querySelector(".maniglia")?.focus();
+}
+
+// drag & drop con pointer events: funziona con mouse, touch e penna
+function iniziaTrascinamento(evento, li) {
+  if (evento.button !== 0) return;
+  evento.preventDefault();
+  const maniglia = evento.currentTarget;
+  const lista = li.parentElement;
+  maniglia.setPointerCapture(evento.pointerId);
+  li.classList.add("trascinato");
+
+  let ultimaY = evento.clientY;
+  let scostamento = 0;
+
+  const scambia = (giu) => {
+    const primaTop = li.offsetTop;
+    if (giu) lista.insertBefore(li.nextElementSibling, li);
+    else lista.insertBefore(li, li.previousElementSibling);
+    scostamento -= li.offsetTop - primaTop;
+  };
+
+  const muovi = (e) => {
+    scostamento += e.clientY - ultimaY;
+    ultimaY = e.clientY;
+    let succ, prec;
+    while ((succ = li.nextElementSibling) && scostamento > succ.offsetHeight / 2) scambia(true);
+    while ((prec = li.previousElementSibling) && scostamento < -prec.offsetHeight / 2) scambia(false);
+    li.style.transform = `translateY(${scostamento}px)`;
+  };
+
+  const fine = () => {
+    maniglia.removeEventListener("pointermove", muovi);
+    maniglia.removeEventListener("pointerup", fine);
+    maniglia.removeEventListener("pointercancel", fine);
+    const nuovoOrdine = [...lista.children].map((el) => stato.muscoli[Number(el.dataset.indice)]);
+    stato.muscoli = compatta(nuovoOrdine);
+    disegnaMuscoli();
+  };
+
+  maniglia.addEventListener("pointermove", muovi);
+  maniglia.addEventListener("pointerup", fine);
+  maniglia.addEventListener("pointercancel", fine);
 }
 
 function pulsanteSposta(simbolo, etichetta, disabilitato, onClick) {
@@ -105,6 +155,19 @@ function disegnaMuscoli() {
   $("muscoli").replaceChildren(...stato.muscoli.map((m, i) => {
     const li = document.createElement("li");
     li.classList.toggle("escluso", !m.attivo);
+    li.dataset.indice = i;
+
+    const maniglia = document.createElement("span");
+    maniglia.className = "maniglia";
+    maniglia.textContent = "⠿";
+    maniglia.tabIndex = 0;
+    maniglia.title = "Trascina per riordinare (o usa le frecce ↑ ↓ della tastiera)";
+    maniglia.setAttribute("aria-label", `Riordina ${nomeMuscolo(m.valore)}, posizione ${i + 1}`);
+    maniglia.addEventListener("pointerdown", (e) => iniziaTrascinamento(e, li));
+    maniglia.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowUp") { e.preventDefault(); sposta(i, -1, true); }
+      if (e.key === "ArrowDown") { e.preventDefault(); sposta(i, 1, true); }
+    });
 
     const numero = document.createElement("span");
     numero.className = "rango";
@@ -114,13 +177,17 @@ function disegnaMuscoli() {
     spunta.type = "checkbox";
     spunta.checked = m.attivo;
     spunta.setAttribute("aria-label", `Allena ${nomeMuscolo(m.valore)}`);
-    spunta.addEventListener("change", () => { m.attivo = spunta.checked; disegnaMuscoli(); });
+    spunta.addEventListener("change", () => {
+      m.attivo = spunta.checked;
+      stato.muscoli = compatta(stato.muscoli);
+      disegnaMuscoli();
+    });
 
     const nome = document.createElement("span");
     nome.className = "nome-muscolo";
     nome.textContent = nomeMuscolo(m.valore);
 
-    li.append(numero, spunta, nome,
+    li.append(maniglia, numero, spunta, nome,
       pulsanteSposta("↑", "Sposta su", i === 0, () => sposta(i, -1)),
       pulsanteSposta("↓", "Sposta giù", i === stato.muscoli.length - 1, () => sposta(i, 1)));
     return li;
