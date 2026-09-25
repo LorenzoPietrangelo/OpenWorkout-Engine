@@ -63,6 +63,7 @@ uvicorn api_wrapper.app:app --reload
 | **Muscle priority** | The muscles you want to train, ordered from most to least important |
 | **Max duration** | Maximum length of each session, in minutes |
 | **Available equipment** | The equipment you have. Leave it empty (`None` / `null`) to assume a fully equipped gym |
+| **Supersets** | Whether you are willing to do [supersets](#supersets) when time is short. Off by default |
 
 Supported muscles: `chest`, `lats`, `upper back`, `side delts`, `triceps`, `biceps`, `quads`, `hamstrings`, `glutes`, `adductors`.
 
@@ -76,7 +77,7 @@ For each training day, the program lists the exercises in order. Each exercise h
 
 - **Sets**, calculated to fill the available time
 - **Rep range**: 8–10 for leg compound movements, 6–8 for everything else
-- **Rest**: 3–5 min for leg compound movements, 2–4 min for everything else
+- **Rest**: 3–5 min for leg compound movements, 2–4 min for everything else. A superset has a single rest (see [Supersets](#supersets))
 
 A rest day between two sessions is marked in the CSV export.
 
@@ -103,6 +104,15 @@ Glutes and adductors can be trained with isolation exercises (hip thrust, adduct
    - if **quads or hamstrings** are also trained that day, the compound uses that muscle as a secondary. If both are trained that day, it uses the one in the lower slot. For example, if hamstrings are already in the workout, a stiff-leg deadlift is chosen.
    - if **neither** is trained that day, the engine picks the one with higher overall priority, as long as it is not trained the next day (to respect recovery).
    - if both quads and hamstrings are trained the next day, the compound is skipped and glutes and adductors fall back to isolation exercises.
+
+### Supersets
+
+A superset is two isolation exercises performed back to back, with a single rest at the end. Supersets are optional: they are used only if you enable them and only when a session does not fit the time limit even with one set per exercise.
+
+- **Which exercises.** Only isolation exercises can be paired, and each exercise can be in at most one superset. The engine pairs the **two lowest isolation exercises** in the workout, even if other exercises sit between them.
+- **Position.** The superset takes the **higher slot** of the two. The first exercise of the superset is the one that was higher in the workout.
+- **Timing.** Warm-up and set duration do not change: they are the sum of the two exercises. Rest changes: there is **one rest per round**, equal to the longer rest of the two exercises **plus 30 seconds** to move from one exercise to the other. With the default values, a round costs 5.5 min instead of 8 min for the two exercises done separately.
+- **Sets.** Both exercises in a superset always get the same number of sets.
 
 ---
 
@@ -131,7 +141,13 @@ The duration of a session is estimated as:
 + for each exercise:  exercise warm-up  +  sets × (set duration + average rest)
 ```
 
-**If a session is too long,** the engine takes the day that exceeds the limit the most and removes the lowest exercise in it that is trained 3 times a week (bringing it down to 2). It then recalculates and repeats until every day fits, or until no exercise trained 3 times a week is left. If a day still does not fit, a warning is returned.
+**If a session is too long** (it exceeds the limit even with one set per exercise), the engine reduces it in two steps. Both steps work the same way: they always act on the day that exceeds the limit the most, make one change, recalculate and repeat.
+
+1. **Supersets** (only if enabled). On the worst day that still has two free isolation exercises, the two lowest are merged into a [superset](#supersets). This repeats until every day fits, or until no day has two free isolation exercises left. It does not remove any exercise, so weekly volume is kept.
+2. **Removing exercises.** On the worst day, the engine removes the lowest exercise that is trained 3 times a week (bringing it down to 2). This repeats until every day fits, or until no exercise trained 3 times a week is left.
+   - If the lowest removable item is a superset, only one of its two exercises is removed: the one trained 3 times a week, or the lower one if both are. The other exercise becomes a normal exercise again and goes back to its **original slot**.
+
+If a day still does not fit, a warning is returned.
 
 **If a session is too short,** sets are added one at a time from the top exercise to the bottom, cycling through the list, until the next set would exceed the time limit. Higher-priority muscles therefore get extra volume first.
 
@@ -158,7 +174,8 @@ POST /scheda
   "priorita_muscoli": ["chest", "lats", "upper back", "quads", "hamstrings",
                        "side delts", "triceps", "biceps", "glutes", "adductors"],
   "max_minuti": 60,
-  "attrezzi_disponibili": null
+  "attrezzi_disponibili": null,
+  "superserie": false
 }
 ```
 
@@ -168,8 +185,9 @@ POST /scheda
 | `priorita_muscoli` | Muscles in priority order |
 | `max_minuti` | Max session length in minutes |
 | `attrezzi_disponibili` | Available equipment, `null` = everything |
+| `superserie` | `true` to allow [supersets](#supersets) when time is short. Optional, default `false` |
 
-The response contains, for each day, the muscles trained, the exercises with sets, reps and rest, the estimated duration and whether it exceeds the limit. It also includes a list of warnings.
+The response contains, for each day, the muscles trained, the exercises with sets, reps and rest, the estimated duration and whether it exceeds the limit. It also includes a list of warnings. A superset appears as a single exercise named after both exercises (e.g. `"Leg curl + Cable push down"`), with its single rest, which can be a decimal number (e.g. `2.5`–`4.5` min).
 
 ---
 
@@ -178,7 +196,7 @@ The response contains, for each day, the muscles trained, the exercises with set
 ```
 open-workout-engine/
 ├── engine.py                 # Core algorithm: weekly split, exercise assignment, sets, CSV export
-├── exercise_model.py         # Data model: muscles, equipment, categories, Esercizio dataclass
+├── exercise_model.py         # Data model: muscles, equipment, categories, Esercizio and SuperSerie
 ├── execises.py               # Exercise catalogue: add new exercises here
 ├── main.py                   # CLI example: edit the inputs and run to generate scheda.csv
 │
