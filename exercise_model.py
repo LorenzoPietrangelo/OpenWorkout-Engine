@@ -47,6 +47,33 @@ class Esercizio:
     attrezzi: list[Attrezzo] = field(default_factory=list)  # lista vuota = corpo libero
 
 
+@dataclass
+class SuperSerie:
+    """Due esercizi di isolamento eseguiti in successione con un unico recupero."""
+    primo: Esercizio
+    secondo: Esercizio
+
+    @property
+    def esercizi(self):
+        return (self.primo, self.secondo)
+
+    @property
+    def nome(self):
+        return f"{self.primo.nome} + {self.secondo.nome}"
+
+    @property
+    def categoria(self):
+        return self.primo.categoria
+
+    @property
+    def tempo_riscaldamento(self):
+        return self.primo.tempo_riscaldamento + self.secondo.tempo_riscaldamento
+
+    @property
+    def tempo_serie(self):
+        return self.primo.tempo_serie + self.secondo.tempo_serie
+
+
 @dataclass(frozen=True)
 class MuscoloScoperto:
     """Segnaposto: nessun esercizio eseguibile con gli attrezzi disponibili."""

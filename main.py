@@ -18,13 +18,14 @@ if __name__ == "__main__":
     Muscolo.GLUTES,
     Muscolo.ADDUCTORS]
     max_minuti = 60  # tempo massimo per allenamento in minuti
+    superserie = True  # se il tempo non basta, unisce gli isolamenti in superserie
 
     # None = tutti gli attrezzi disponibili; altrimenti elenca quelli che hai
     attrezzi_disponibili = None
 
     week = build_week(days_selected, muscle_priority)
     scheda = assegna_esercizi(week, muscle_priority, esercizi, attrezzi_disponibili)
-    scheda_con_serie = calcola_serie(scheda, max_minuti)                 # 3. numero di serie
+    scheda_con_serie = calcola_serie(scheda, max_minuti, superserie)                 # 3. numero di serie
 
     print("--------------------------------------------------------------------------------")
 
