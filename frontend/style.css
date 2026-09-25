@@ -51,6 +51,7 @@ form section + section { margin-top: 28px; }
 .hint { margin: -4px 0 12px; color: var(--muted); font-size: 0.9rem; }
 
 .inline { display: inline-flex; align-items: center; gap: 10px; }
+.opzione { display: flex; margin-top: 14px; }
 
 input[type="number"] {
   width: 90px;

@@ -255,6 +255,7 @@ function leggiRichiesta() {
     priorita_muscoli: stato.muscoli.filter((m) => m.attivo).map((m) => m.valore),
     max_minuti: Number($("max-minuti").value),
     attrezzi_disponibili: $("tutti-attrezzi").checked ? null : [...stato.attrezzi],
+    superserie: $("superserie").checked,
   };
 }
 

@@ -2,7 +2,7 @@ import csv
 import io
 
 from engine import (build_week, assegna_esercizi, calcola_serie, durata_con_serie,
-                    righe_scheda, scoperto, RECUPERO, RECUPERO_DEFAULT,
+                    righe_scheda, scoperto, intervallo_recupero,
                     RIPETIZIONI, RIPETIZIONI_DEFAULT)
 from execises import esercizi
 
@@ -15,7 +15,7 @@ def genera(richiesta):
     week = build_week(richiesta.giorni, richiesta.priorita_muscoli)
     scheda = assegna_esercizi(week, richiesta.priorita_muscoli, esercizi,
                               richiesta.attrezzi_disponibili)
-    return week, calcola_serie(scheda, richiesta.max_minuti)
+    return week, calcola_serie(scheda, richiesta.max_minuti, richiesta.superserie)
 
 
 #conversione dei risultati del motore nei modelli dell'api
@@ -28,9 +28,10 @@ def voce(e, serie):
     if scoperto(e):
         return VoceEsercizio(nome=e.nome, serie=0, ripetizioni=None,
                              recupero_minuti=None, scoperto=True)
+    minimo, massimo = intervallo_recupero(e)
     return VoceEsercizio(nome=e.nome, serie=serie,
                          ripetizioni=intervallo(RIPETIZIONI, RIPETIZIONI_DEFAULT, e),
-                         recupero_minuti=intervallo(RECUPERO, RECUPERO_DEFAULT, e),
+                         recupero_minuti=Intervallo(min=minimo, max=massimo),
                          scoperto=False)
 
 def info_esercizio(e):

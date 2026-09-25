@@ -18,6 +18,9 @@ class RichiestaScheda(BaseModel):
                             examples=[60])
     attrezzi_disponibili: list[Attrezzo] | None = Field(
         default=None, description="Attrezzi disponibili; null = tutti")
+    superserie: bool = Field(
+        default=False,
+        description="Se il tempo non basta, unisce gli esercizi di isolamento in superserie")
 
     @field_validator("giorni")
     @classmethod
@@ -39,8 +42,8 @@ class RichiestaScheda(BaseModel):
 #modelli di output
 
 class Intervallo(BaseModel):
-    min: int
-    max: int
+    min: int | float
+    max: int | float
 
 
 class VoceEsercizio(BaseModel):
