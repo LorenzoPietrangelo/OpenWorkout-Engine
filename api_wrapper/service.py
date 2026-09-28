@@ -15,7 +15,8 @@ def genera(richiesta):
     week = build_week(richiesta.giorni, richiesta.priorita_muscoli)
     scheda = assegna_esercizi(week, richiesta.priorita_muscoli, esercizi,
                               richiesta.attrezzi_disponibili)
-    return week, calcola_serie(scheda, richiesta.max_minuti, richiesta.superserie)
+    return week, calcola_serie(scheda, richiesta.max_minuti, richiesta.superserie,
+                               richiesta.monolaterali, esercizi)
 
 
 #conversione dei risultati del motore nei modelli dell'api

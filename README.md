@@ -64,6 +64,7 @@ uvicorn api_wrapper.app:app --reload
 | **Max duration** | Maximum length of each session, in minutes |
 | **Available equipment** | The equipment you have. Leave it empty (`None` / `null`) to assume a fully equipped gym |
 | **Supersets** | Whether you are willing to do [supersets](#supersets) when time is short. Off by default |
+| **Unilateral exercises** | Whether you want [unilateral variants](#unilateral-exercises) when there is time left. Off by default |
 
 Supported muscles: `chest`, `lats`, `upper back`, `side delts`, `triceps`, `biceps`, `quads`, `hamstrings`, `glutes`, `adductors`.
 
@@ -114,6 +115,14 @@ A superset is two isolation exercises performed back to back, with a single rest
 - **Timing.** Warm-up and set duration do not change: they are the sum of the two exercises. Rest changes: there is **one rest per round**, equal to the longer rest of the two exercises **plus 30 seconds** to move from one exercise to the other. With the default values, a round costs 5.5 min instead of 8 min for the two exercises done separately.
 - **Sets.** Both exercises in a superset always get the same number of sets.
 
+### Unilateral exercises
+
+A unilateral exercise works one side at a time (e.g. single leg extension instead of leg extension). Unilateral variants are optional: they are used only if you enable them and only when a session has time left with one set per exercise.
+
+- **Which variant.** The unilateral variant of an exercise is the one with `monolaterale=True` and the same primary muscles, secondary muscles, category and equipment. Exercises without a variant stay as they are.
+- **Timing.** Each side is treated as a normal set, with its own rest. A unilateral set therefore costs **twice** a normal set.
+- **Selection.** Unilateral variants are never picked as the base exercise for a muscle: they only replace an exercise when there is time left.
+
 ---
 
 ## How the algorithm works
@@ -147,9 +156,14 @@ The duration of a session is estimated as:
 2. **Removing exercises.** On the worst day, the engine removes the lowest exercise that is trained 3 times a week (bringing it down to 2). This repeats until every day fits, or until no exercise trained 3 times a week is left.
    - If the lowest removable item is a superset, only one of its two exercises is removed: the one trained 3 times a week, or the lower one if both are. The other exercise becomes a normal exercise again and goes back to its **original slot**.
 
-If a day still does not fit, a warning is returned.
+A reduced session keeps one set per exercise, even if a change leaves some time unused: the session can end up shorter than the limit. If a day still does not fit, a warning is returned.
 
-**If a session is too short,** sets are added one at a time from the top exercise to the bottom, cycling through the list, until the next set would exceed the time limit. Higher-priority muscles therefore get extra volume first.
+**If a session is too short,** the free time is filled in two steps:
+
+1. **Unilateral variants** (only if enabled). From the top exercise to the bottom, each exercise is replaced with its [unilateral variant](#unilateral-exercises) if the session still fits the limit; otherwise it is skipped and the next one is tried. Exercises in a superset are never replaced.
+2. **Adding sets.** Sets are added one at a time from the top exercise to the bottom, cycling through the list, until the next set would exceed the time limit. Higher-priority muscles therefore get extra volume first.
+
+Each day follows only one of the two paths: a session that was reduced never gets unilateral variants or extra sets.
 
 ---
 
@@ -175,7 +189,8 @@ POST /scheda
                        "side delts", "triceps", "biceps", "glutes", "adductors"],
   "max_minuti": 60,
   "attrezzi_disponibili": null,
-  "superserie": false
+  "superserie": false,
+  "monolaterali": false
 }
 ```
 
@@ -186,6 +201,7 @@ POST /scheda
 | `max_minuti` | Max session length in minutes |
 | `attrezzi_disponibili` | Available equipment, `null` = everything |
 | `superserie` | `true` to allow [supersets](#supersets) when time is short. Optional, default `false` |
+| `monolaterali` | `true` to use [unilateral variants](#unilateral-exercises) when there is time left. Optional, default `false` |
 
 The response contains, for each day, the muscles trained, the exercises with sets, reps and rest, the estimated duration and whether it exceeds the limit. It also includes a list of warnings. A superset appears as a single exercise named after both exercises (e.g. `"Leg curl + Cable push down"`), with its single rest, which can be a decimal number (e.g. `2.5`–`4.5` min).
 
@@ -234,9 +250,12 @@ Esercizio(
     muscoli_secondari=[Muscolo.QUADS],            # secondary muscles
     tempo_riscaldamento=5,                        # warm-up time (min)
     tempo_serie=1,                                # duration of one set (min)
+    monolaterale=False,                           # True for a unilateral variant
     attrezzi=[Attrezzo.BILANCIERE],               # required equipment (empty = bodyweight)
 ),
 ```
+
+To add a unilateral variant, add a second exercise with `monolaterale=True` and the same muscles, category and equipment as the original.
 
 When several exercises fit the same muscle and equipment, the engine picks the **first one in the list**, so order matters.
 

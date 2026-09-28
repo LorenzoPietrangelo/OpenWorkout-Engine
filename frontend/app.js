@@ -256,6 +256,7 @@ function leggiRichiesta() {
     max_minuti: Number($("max-minuti").value),
     attrezzi_disponibili: $("tutti-attrezzi").checked ? null : [...stato.attrezzi],
     superserie: $("superserie").checked,
+    monolaterali: $("monolaterali").checked,
   };
 }
 

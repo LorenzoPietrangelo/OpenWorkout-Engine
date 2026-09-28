@@ -21,6 +21,9 @@ class RichiestaScheda(BaseModel):
     superserie: bool = Field(
         default=False,
         description="Se il tempo non basta, unisce gli esercizi di isolamento in superserie")
+    monolaterali: bool = Field(
+        default=False,
+        description="Se il tempo avanza, sostituisce gli esercizi con la variante monolaterale")
 
     @field_validator("giorni")
     @classmethod

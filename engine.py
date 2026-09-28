@@ -85,6 +85,7 @@ def oppure_scoperto(e, muscolo):
     return MuscoloScoperto(muscolo) if e is None else e
 
 def assegna_esercizi(week, priorita, esercizi, attrezzi=None):
+    esercizi = [e for e in esercizi if not e.monolaterale]
     gambe_speciali = (Muscolo.GLUTES, Muscolo.ADDUCTORS)
     base = {m: esercizio_per(m, esercizi, attrezzi)
             for m in priorita if m not in gambe_speciali}
@@ -123,8 +124,11 @@ def intervallo_recupero(e):
 def recupero(e):
     return sum(intervallo_recupero(e)) / 2
 
+def lati(e):
+    return 2 if isinstance(e, Esercizio) and e.monolaterale else 1
+
 def tempo_serie(e):
-    return 0 if scoperto(e) else e.tempo_serie + recupero(e)
+    return 0 if scoperto(e) else lati(e) * (e.tempo_serie + recupero(e))
 
 def durata(workout, serie):
     return RISCALDAMENTO_GENERALE + sum(
@@ -179,8 +183,32 @@ def taglia_workout(scheda, originale, max_minuti):
         taglia(scheda[g], indice_tagliabile(scheda[g], istanze), istanze, originale[g])
     return scheda
 
+def variante_monolaterale(e, esercizi):
+    return next((x for x in esercizi
+                 if x.monolaterale
+                 and set(x.muscoli_primari) == set(e.muscoli_primari)
+                 and set(x.muscoli_secondari) == set(e.muscoli_secondari)
+                 and x.categoria == e.categoria
+                 and set(x.attrezzi) == set(e.attrezzi)), None)
+
+def scambia_monolaterali(workout, max_minuti, esercizi):
+    workout = list(workout)
+    for i, e in enumerate(workout):
+        if not isinstance(e, Esercizio) or e.monolaterale:
+            continue
+        variante = variante_monolaterale(e, esercizi)
+        if variante is None:
+            continue
+        workout[i] = variante
+        if eccesso(workout, max_minuti) > 0:
+            workout[i] = e
+    return workout
+
+def serie_base(workout):
+    return [0 if scoperto(e) else 1 for e in workout]
+
 def aggiungi_serie(workout, max_minuti):
-    serie = [0 if scoperto(e) else 1 for e in workout]
+    serie = serie_base(workout)
     reali = [i for i, e in enumerate(workout) if not scoperto(e)]
     while reali:
         for i in reali:
@@ -189,17 +217,27 @@ def aggiungi_serie(workout, max_minuti):
             serie[i] += 1
     return list(zip(workout, serie))
 
-def calcola_serie(scheda, max_minuti, superserie=False):
+# un giorno segue una sola strada: se sfora si riduce (superserie e tagli) e resta a 1 serie,
+# altrimenti si riempie il tempo (varianti monolaterali, poi serie)
+def calcola_serie(scheda, max_minuti, superserie=False, monolaterali=False, esercizi=esercizi):
     originale = scheda
+    sforati = {g for g, w in scheda.items() if eccesso(w, max_minuti) > 0}
     if superserie:
         scheda = forma_superserie(scheda, max_minuti)
     scheda = taglia_workout(scheda, originale, max_minuti)
+    risultato = {}
     for g, w in scheda.items():
-        minimo = durata(w, [1] * len(w))
-        if minimo > max_minuti:
-            print(f"Attenzione: il giorno {g} dura almeno {minimo} min, "
-                  f"non è possibile rispettare il limite di {max_minuti} min.")
-    return {g: aggiungi_serie(w, max_minuti) for g, w in scheda.items()}
+        if g in sforati:
+            minimo = durata(w, [1] * len(w))
+            if minimo > max_minuti:
+                print(f"Attenzione: il giorno {g} dura almeno {minimo} min, "
+                      f"non è possibile rispettare il limite di {max_minuti} min.")
+            risultato[g] = list(zip(w, serie_base(w)))
+            continue
+        if monolaterali:
+            w = scambia_monolaterali(w, max_minuti, esercizi)
+        risultato[g] = aggiungi_serie(w, max_minuti)
+    return risultato
 
 
 
