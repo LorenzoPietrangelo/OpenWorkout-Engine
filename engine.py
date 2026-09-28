@@ -70,15 +70,20 @@ def compound_glutei_adduttori(secondario, esercizi, attrezzi=None):
                  and secondario in e.muscoli_secondari
                  and eseguibile(e, attrezzi)), None)
 
+def vicini(giorno, week):
+    return [m for d in range(1, MIN_REST)
+              for g in ((giorno - d - 1) % 7 + 1, (giorno + d - 1) % 7 + 1)
+              for m in week.get(g, [])]
+
 def scegli_secondario(giorno, week, priorita):
     oggi = week[giorno]
-    domani = week.get(giorno % 7 + 1, [])
     presenti = [m for m in (Muscolo.QUADS, Muscolo.HAMSTRINGS) if m in oggi]
     if presenti:
         return max(presenti, key=oggi.index)
     ordinati = sorted((Muscolo.QUADS, Muscolo.HAMSTRINGS),
                       key=lambda m: priorita.index(m) if m in priorita else len(priorita))
-    liberi = [m for m in ordinati if m not in domani]
+    adiacenti = vicini(giorno, week)
+    liberi = [m for m in ordinati if m not in adiacenti]
     return liberi[0] if liberi else None
 
 def oppure_scoperto(e, muscolo):

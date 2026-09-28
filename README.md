@@ -103,8 +103,8 @@ Glutes and adductors can be trained with isolation exercises (hip thrust, adduct
 2. If they are on the same day and **at least one of them is in the top 4 slots** of that workout, they are still high-priority, so each gets its own isolation exercise.
 3. If they are on the same day and **both are below the top 4 slots**, a single compound movement replaces both. It takes the lower of their two slots. The compound is chosen based on its secondary muscle:
    - if **quads or hamstrings** are also trained that day, the compound uses that muscle as a secondary. If both are trained that day, it uses the one in the lower slot. For example, if hamstrings are already in the workout, a stiff-leg deadlift is chosen.
-   - if **neither** is trained that day, the engine picks the one with higher overall priority, as long as it is not trained the next day (to respect recovery).
-   - if both quads and hamstrings are trained the next day, the compound is skipped and glutes and adductors fall back to isolation exercises.
+   - if **neither** is trained that day, the engine picks the one with higher overall priority, as long as it is not trained the day before or the day after (to respect recovery).
+   - if both quads and hamstrings are trained the day before or the day after, the compound is skipped and glutes and adductors fall back to isolation exercises.
 
 ### Supersets
 
