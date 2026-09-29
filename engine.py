@@ -2,21 +2,40 @@
 import csv
 from collections import Counter
 from itertools import combinations
-from exercise_model import Esercizio, Categoria, Muscolo, Attrezzo, MuscoloScoperto, SuperSerie
+from exercise_model import Esercizio, Categoria, Muscolo, Attrezzo, MuscoloScoperto, SuperSerie, Livello
 from execises import esercizi
 
 MIN_REST = 2
 TOP_SLOT = 4
 
 RISCALDAMENTO_GENERALE = 10
-RECUPERO = {Categoria.COMPOUND_GAMBE: (3, 5)}  # (min, max) in minuti
-RECUPERO_DEFAULT = (2, 4)
 CAMBIO_ESERCIZIO = 0.5  # minuti per passare da un esercizio all'altro in superserie
 
-RIPETIZIONI = {Categoria.COMPOUND_GAMBE: (8, 10)}  # (min, max)
-RIPETIZIONI_DEFAULT = (6, 8)
+# (min, max) in minuti; per ora l'avanzato usa gli stessi valori dell'intermedio
+RECUPERO = {
+    Livello.PRINCIPIANTE: {Categoria.ISOLAMENTO: (2, 3),
+                           Categoria.COMPOUND_UPPER: (2, 3),
+                           Categoria.COMPOUND_GAMBE: (3, 4)},
+    Livello.INTERMEDIO: {Categoria.ISOLAMENTO: (2, 4),
+                         Categoria.COMPOUND_UPPER: (2, 4),
+                         Categoria.COMPOUND_GAMBE: (3, 5)},
+}
+RECUPERO[Livello.AVANZATO] = RECUPERO[Livello.INTERMEDIO]
 
-INTESTAZIONE = ["esercizio", "serie", "ripetizioni", "recupero"]
+# (min, max)
+RIPETIZIONI = {
+    Livello.PRINCIPIANTE: {Categoria.ISOLAMENTO: (8, 10),
+                           Categoria.COMPOUND_UPPER: (8, 10),
+                           Categoria.COMPOUND_GAMBE: (6, 8)},
+    Livello.INTERMEDIO: {Categoria.ISOLAMENTO: (6, 8),
+                         Categoria.COMPOUND_UPPER: (6, 8),
+                         Categoria.COMPOUND_GAMBE: (4, 6)},
+}
+RIPETIZIONI[Livello.AVANZATO] = RIPETIZIONI[Livello.INTERMEDIO]
+
+RIR = {Livello.PRINCIPIANTE: (0, 0), Livello.INTERMEDIO: (0, 1), Livello.AVANZATO: (1, 2)}  # (min, max)
+
+INTESTAZIONE = ["esercizio", "serie", "ripetizioni", "recupero", "rir"]
 
 
 #insieme di metodi che generano la seettimana con i muscoli ordianti
@@ -120,35 +139,35 @@ def assegna_esercizi(week, priorita, esercizi, attrezzi=None):
 def componenti(e):
     return e.esercizi if isinstance(e, SuperSerie) else (e,)
 
-def intervallo_recupero(e):
+def intervallo_recupero(e, livello):
     if isinstance(e, SuperSerie):
-        minimo, massimo = max((intervallo_recupero(x) for x in e.esercizi), key=sum)
+        minimo, massimo = max((intervallo_recupero(x, livello) for x in e.esercizi), key=sum)
         return minimo + CAMBIO_ESERCIZIO, massimo + CAMBIO_ESERCIZIO
-    return RECUPERO.get(e.categoria, RECUPERO_DEFAULT)
+    return RECUPERO[livello][e.categoria]
 
-def recupero(e):
-    return sum(intervallo_recupero(e)) / 2
+def recupero(e, livello):
+    return sum(intervallo_recupero(e, livello)) / 2
 
 def lati(e):
     return 2 if isinstance(e, Esercizio) and e.monolaterale else 1
 
-def tempo_serie(e):
-    return 0 if scoperto(e) else lati(e) * (e.tempo_serie + recupero(e))
+def tempo_serie(e, livello):
+    return 0 if scoperto(e) else lati(e) * (e.tempo_serie + recupero(e, livello))
 
-def durata(workout, serie):
+def durata(workout, serie, livello):
     return RISCALDAMENTO_GENERALE + sum(
-        e.tempo_riscaldamento + s * tempo_serie(e) for e, s in zip(workout, serie))
+        e.tempo_riscaldamento + s * tempo_serie(e, livello) for e, s in zip(workout, serie))
 
-def durata_con_serie(workout):
-    return durata([e for e, _ in workout], [s for _, s in workout]) if workout else 0
+def durata_con_serie(workout, livello):
+    return durata([e for e, _ in workout], [s for _, s in workout], livello) if workout else 0
 
-def eccesso(workout, max_minuti):
-    return durata(workout, [1] * len(workout)) - max_minuti
+def eccesso(workout, max_minuti, livello):
+    return durata(workout, [1] * len(workout), livello) - max_minuti
 
-def giorno_peggiore(scheda, max_minuti, riducibile):
+def giorno_peggiore(scheda, max_minuti, livello, riducibile):
     candidati = [g for g, w in scheda.items()
-                 if eccesso(w, max_minuti) > 0 and riducibile(w)]
-    return max(candidati, key=lambda g: eccesso(scheda[g], max_minuti), default=None)
+                 if eccesso(w, max_minuti, livello) > 0 and riducibile(w)]
+    return max(candidati, key=lambda g: eccesso(scheda[g], max_minuti, livello), default=None)
 
 def isolamenti_liberi(workout):
     return [i for i, e in enumerate(workout)
@@ -158,9 +177,9 @@ def unisci_isolamenti(workout):
     alto, basso = isolamenti_liberi(workout)[-2:]
     workout[alto] = SuperSerie(workout[alto], workout.pop(basso))
 
-def forma_superserie(scheda, max_minuti):
+def forma_superserie(scheda, max_minuti, livello):
     scheda = {g: list(w) for g, w in scheda.items()}
-    while (g := giorno_peggiore(scheda, max_minuti,
+    while (g := giorno_peggiore(scheda, max_minuti, livello,
                                 lambda w: len(isolamenti_liberi(w)) >= 2)) is not None:
         unisci_isolamenti(scheda[g])
     return scheda
@@ -180,11 +199,11 @@ def taglia(workout, i, istanze, originale):
     workout.extend(x for x in componenti(e) if x is not tagliato)
     workout.sort(key=lambda x: slot(x, originale))
 
-def taglia_workout(scheda, originale, max_minuti):
+def taglia_workout(scheda, originale, max_minuti, livello):
     scheda = {g: list(w) for g, w in scheda.items()}
     istanze = Counter(x.nome for w in scheda.values() for e in w for x in componenti(e))
     tagliabile = lambda w: indice_tagliabile(w, istanze) is not None
-    while (g := giorno_peggiore(scheda, max_minuti, tagliabile)) is not None:
+    while (g := giorno_peggiore(scheda, max_minuti, livello, tagliabile)) is not None:
         taglia(scheda[g], indice_tagliabile(scheda[g], istanze), istanze, originale[g])
     return scheda
 
@@ -196,7 +215,7 @@ def variante_monolaterale(e, esercizi):
                  and x.categoria == e.categoria
                  and set(x.attrezzi) == set(e.attrezzi)), None)
 
-def scambia_monolaterali(workout, max_minuti, esercizi):
+def scambia_monolaterali(workout, max_minuti, livello, esercizi):
     workout = list(workout)
     for i, e in enumerate(workout):
         if not isinstance(e, Esercizio) or e.monolaterale:
@@ -205,43 +224,44 @@ def scambia_monolaterali(workout, max_minuti, esercizi):
         if variante is None:
             continue
         workout[i] = variante
-        if eccesso(workout, max_minuti) > 0:
+        if eccesso(workout, max_minuti, livello) > 0:
             workout[i] = e
     return workout
 
 def serie_base(workout):
     return [0 if scoperto(e) else 1 for e in workout]
 
-def aggiungi_serie(workout, max_minuti):
+def aggiungi_serie(workout, max_minuti, livello):
     serie = serie_base(workout)
     reali = [i for i, e in enumerate(workout) if not scoperto(e)]
     while reali:
         for i in reali:
-            if durata(workout, serie) + tempo_serie(workout[i]) > max_minuti:
+            if durata(workout, serie, livello) + tempo_serie(workout[i], livello) > max_minuti:
                 return list(zip(workout, serie))
             serie[i] += 1
     return list(zip(workout, serie))
 
 # un giorno segue una sola strada: se sfora si riduce (superserie e tagli) e resta a 1 serie,
 # altrimenti si riempie il tempo (varianti monolaterali, poi serie)
-def calcola_serie(scheda, max_minuti, superserie=False, monolaterali=False, esercizi=esercizi):
+def calcola_serie(scheda, max_minuti, superserie=False, monolaterali=False, esercizi=esercizi,
+                  livello=Livello.PRINCIPIANTE):
     originale = scheda
-    sforati = {g for g, w in scheda.items() if eccesso(w, max_minuti) > 0}
+    sforati = {g for g, w in scheda.items() if eccesso(w, max_minuti, livello) > 0}
     if superserie:
-        scheda = forma_superserie(scheda, max_minuti)
-    scheda = taglia_workout(scheda, originale, max_minuti)
+        scheda = forma_superserie(scheda, max_minuti, livello)
+    scheda = taglia_workout(scheda, originale, max_minuti, livello)
     risultato = {}
     for g, w in scheda.items():
         if g in sforati:
-            minimo = durata(w, [1] * len(w))
+            minimo = durata(w, [1] * len(w), livello)
             if minimo > max_minuti:
                 print(f"Attenzione: il giorno {g} dura almeno {minimo} min, "
                       f"non è possibile rispettare il limite di {max_minuti} min.")
             risultato[g] = list(zip(w, serie_base(w)))
             continue
         if monolaterali:
-            w = scambia_monolaterali(w, max_minuti, esercizi)
-        risultato[g] = aggiungi_serie(w, max_minuti)
+            w = scambia_monolaterali(w, max_minuti, livello, esercizi)
+        risultato[g] = aggiungi_serie(w, max_minuti, livello)
     return risultato
 
 
@@ -254,38 +274,42 @@ def calcola_serie(scheda, max_minuti, superserie=False, monolaterali=False, eser
 
 #insieme dei metodi che completano la scheda e producono il file .csv
 
-def ripetizioni(e):
-    minimo, massimo = RIPETIZIONI.get(e.categoria, RIPETIZIONI_DEFAULT)
+def ripetizioni(e, livello):
+    minimo, massimo = RIPETIZIONI[livello][e.categoria]
     return f"{minimo}|{massimo}"
 
-def recupero_testo(e):
-    minimo, massimo = intervallo_recupero(e)
+def recupero_testo(e, livello):
+    minimo, massimo = intervallo_recupero(e, livello)
     return f"{minimo}|{massimo} min"
 
-def riga_esercizio(e, serie):
-    if scoperto(e):
-        return [e.nome, "", "", ""]
-    return [e.nome, serie, ripetizioni(e), recupero_testo(e)]
+def rir_testo(livello):
+    minimo, massimo = RIR[livello]
+    return f"{minimo}" if minimo == massimo else f"{minimo}|{massimo}"
 
-def tabella_workout(numero, workout):
-    return [[f"workout {numero}", "", "", ""],
+def riga_esercizio(e, serie, livello):
+    if scoperto(e):
+        return [e.nome, "", "", "", ""]
+    return [e.nome, serie, ripetizioni(e, livello), recupero_testo(e, livello), rir_testo(livello)]
+
+def tabella_workout(numero, workout, livello):
+    return [[f"workout {numero}", "", "", "", ""],
             INTESTAZIONE,
-            *(riga_esercizio(e, s) for e, s in workout)]
+            *(riga_esercizio(e, s, livello) for e, s in workout)]
 
 def separatore(giorno_precedente, giorno):
     return [[], ["REST DAY"], []] if giorno - giorno_precedente > 1 else [[]]
 
-def righe_scheda(scheda):
+def righe_scheda(scheda, livello):
     giorni = sorted(scheda)
     righe = []
     for numero, giorno in enumerate(giorni, start=1):
         if numero > 1:
             righe += separatore(giorni[numero - 2], giorno)
-        righe += tabella_workout(numero, scheda[giorno])
+        righe += tabella_workout(numero, scheda[giorno], livello)
     return righe
 
-def scrivi_csv(scheda, percorso="scheda.csv"):
+def scrivi_csv(scheda, livello, percorso="scheda.csv"):
     with open(percorso, "w", newline="", encoding="utf-8") as f:
-        csv.writer(f).writerows(righe_scheda(scheda))
+        csv.writer(f).writerows(righe_scheda(scheda, livello))
     return percorso
 

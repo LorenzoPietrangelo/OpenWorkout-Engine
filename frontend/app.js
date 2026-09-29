@@ -257,6 +257,7 @@ function leggiRichiesta() {
     attrezzi_disponibili: $("tutti-attrezzi").checked ? null : [...stato.attrezzi],
     superserie: $("superserie").checked,
     monolaterali: $("monolaterali").checked,
+    livello: document.querySelector('input[name="livello"]:checked').value,
   };
 }
 
@@ -271,7 +272,8 @@ function controllaRichiesta(r) {
 //visualizzazione della scheda
 
 function intervallo(i, suffisso = "") {
-  return i ? `${i.min}–${i.max}${suffisso}` : "";
+  if (!i) return "";
+  return i.min === i.max ? `${i.min}${suffisso}` : `${i.min}–${i.max}${suffisso}`;
 }
 
 function cella(testo, classe) {
@@ -283,20 +285,21 @@ function cella(testo, classe) {
 
 function tabellaEsercizi(esercizi) {
   const table = document.createElement("table");
-  table.innerHTML = "<thead><tr><th>Esercizio</th><th>Serie</th><th>Rip.</th><th>Recupero</th></tr></thead>";
+  table.innerHTML = "<thead><tr><th>Esercizio</th><th>Serie</th><th>Rip.</th><th>Recupero</th><th>RIR</th></tr></thead>";
   const tbody = document.createElement("tbody");
   for (const e of esercizi) {
     const tr = document.createElement("tr");
     if (e.scoperto) {
       tr.className = "scoperto";
       const td = cella(maiuscola(e.nome));
-      td.colSpan = 4;
+      td.colSpan = 5;
       tr.append(td);
     } else {
       tr.append(cella(e.nome),
                 cella(String(e.serie), "num"),
                 cella(intervallo(e.ripetizioni), "num"),
-                cella(intervallo(e.recupero_minuti, " min"), "num"));
+                cella(intervallo(e.recupero_minuti, " min"), "num"),
+                cella(intervallo(e.rir), "num"));
     }
     tbody.append(tr);
   }

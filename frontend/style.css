@@ -62,7 +62,10 @@ input[type="number"] {
   border-radius: 8px;
 }
 
-input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); }
+input[type="checkbox"], input[type="radio"] { width: 18px; height: 18px; accent-color: var(--accent); }
+
+/* scelta singola (livello) */
+.scelte { display: flex; flex-wrap: wrap; gap: 8px 24px; }
 
 /* chip selezionabili (giorni, attrezzi) */
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }

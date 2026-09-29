@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, field_validator
 
-from exercise_model import Muscolo, Attrezzo, Categoria
+from exercise_model import Muscolo, Attrezzo, Categoria, Livello
 
 
 #modelli di input
@@ -24,6 +24,9 @@ class RichiestaScheda(BaseModel):
     monolaterali: bool = Field(
         default=False,
         description="Se il tempo avanza, sostituisce gli esercizi con la variante monolaterale")
+    livello: Livello = Field(
+        default=Livello.PRINCIPIANTE,
+        description="Livello di esperienza: determina ripetizioni, recuperi e RIR")
 
     @field_validator("giorni")
     @classmethod
@@ -54,6 +57,7 @@ class VoceEsercizio(BaseModel):
     serie: int
     ripetizioni: Intervallo | None
     recupero_minuti: Intervallo | None
+    rir: Intervallo | None
     scoperto: bool
 
 

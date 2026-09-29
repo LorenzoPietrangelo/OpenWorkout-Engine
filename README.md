@@ -65,6 +65,7 @@ uvicorn api_wrapper.app:app --reload
 | **Available equipment** | The equipment you have. Leave it empty (`None` / `null`) to assume a fully equipped gym |
 | **Supersets** | Whether you are willing to do [supersets](#supersets) when time is short. Off by default |
 | **Unilateral exercises** | Whether you want [unilateral variants](#unilateral-exercises) when there is time left. Off by default |
+| **Experience level** | Beginner, intermediate or advanced. It sets reps, rest and RIR (see [Output](#output)). Beginner by default |
 
 Supported muscles: `chest`, `lats`, `upper back`, `side delts`, `triceps`, `biceps`, `quads`, `hamstrings`, `glutes`, `adductors`.
 
@@ -77,8 +78,15 @@ Supported equipment: dumbbells, barbell, bench, cables, pec fly machine, leg ext
 For each training day, the program lists the exercises in order. Each exercise has:
 
 - **Sets**, calculated to fill the available time
-- **Rep range**: 8–10 for leg compound movements, 6–8 for everything else
-- **Rest**: 3–5 min for leg compound movements, 2–4 min for everything else. A superset has a single rest (see [Supersets](#supersets))
+- **Rep range**, **rest** and **RIR** (reps in reserve), which depend on the experience level:
+
+| Level | Isolation | Upper compound | Leg compound | RIR |
+|---|---|---|---|---|
+| Beginner | 8–10 reps, 2–3 min | 8–10 reps, 2–3 min | 6–8 reps, 3–4 min | 0 |
+| Intermediate | 6–8 reps, 2–4 min | 6–8 reps, 2–4 min | 4–6 reps, 3–5 min | 0–1 |
+| Advanced | 6–8 reps, 2–4 min | 6–8 reps, 2–4 min | 4–6 reps, 3–5 min | 1–2 |
+
+A superset has a single rest (see [Supersets](#supersets)).
 
 A rest day between two sessions is marked in the CSV export.
 
@@ -112,7 +120,7 @@ A superset is two isolation exercises performed back to back, with a single rest
 
 - **Which exercises.** Only isolation exercises can be paired, and each exercise can be in at most one superset. The engine pairs the **two lowest isolation exercises** in the workout, even if other exercises sit between them.
 - **Position.** The superset takes the **higher slot** of the two. The first exercise of the superset is the one that was higher in the workout.
-- **Timing.** Warm-up and set duration do not change: they are the sum of the two exercises. Rest changes: there is **one rest per round**, equal to the longer rest of the two exercises **plus 30 seconds** to move from one exercise to the other. With the default values, a round costs 5.5 min instead of 8 min for the two exercises done separately.
+- **Timing.** Warm-up and set duration do not change: they are the sum of the two exercises. Rest changes: there is **one rest per round**, equal to the longer rest of the two exercises **plus 30 seconds** to move from one exercise to the other. For example, with intermediate values, a round costs 5.5 min instead of 8 min for the two exercises done separately.
 - **Sets.** Both exercises in a superset always get the same number of sets.
 
 ### Unilateral exercises
@@ -190,7 +198,8 @@ POST /scheda
   "max_minuti": 60,
   "attrezzi_disponibili": null,
   "superserie": false,
-  "monolaterali": false
+  "monolaterali": false,
+  "livello": "principiante"
 }
 ```
 
@@ -202,8 +211,9 @@ POST /scheda
 | `attrezzi_disponibili` | Available equipment, `null` = everything |
 | `superserie` | `true` to allow [supersets](#supersets) when time is short. Optional, default `false` |
 | `monolaterali` | `true` to use [unilateral variants](#unilateral-exercises) when there is time left. Optional, default `false` |
+| `livello` | Experience level: `principiante`, `intermedio` or `avanzato`. Optional, default `principiante` |
 
-The response contains, for each day, the muscles trained, the exercises with sets, reps and rest, the estimated duration and whether it exceeds the limit. It also includes a list of warnings. A superset appears as a single exercise named after both exercises (e.g. `"Leg curl + Cable push down"`), with its single rest, which can be a decimal number (e.g. `2.5`–`4.5` min).
+The response contains, for each day, the muscles trained, the exercises with sets, reps, rest and RIR, the estimated duration and whether it exceeds the limit. It also includes a list of warnings. A superset appears as a single exercise named after both exercises (e.g. `"Leg curl + Cable push down"`), with its single rest, which can be a decimal number (e.g. `2.5`–`4.5` min).
 
 ---
 
@@ -270,7 +280,7 @@ When several exercises fit the same muscle and equipment, the engine picks the *
 
 ## Roadmap
 
-- **Experience level (beginner / advanced).** Advanced lifters will be able to target different regions of the same muscle (e.g. upper and lower chest). Regions will be treated as one muscle for placement, so they are always trained in the same session.
+- **Muscle regions for advanced lifters.** Advanced lifters will be able to target different regions of the same muscle (e.g. upper and lower chest). Regions will be treated as one muscle for placement, so they are always trained in the same session.
 - **Full Body A/B split.** Two alternating workouts in a rolling cycle, e.g. with 3 sessions per week: week 1 `A → B → A`, week 2 `B → A → B`.
 - Separate *priority* and *non-priority* muscle lists.
 - Clear feedback when the selected days cannot produce a valid program.

@@ -1,6 +1,12 @@
 from dataclasses import dataclass, field
 from enum import Enum
 
+class Livello(Enum):
+    PRINCIPIANTE = "principiante"
+    INTERMEDIO = "intermedio"
+    AVANZATO = "avanzato"
+
+
 class Categoria(Enum):
     ISOLAMENTO = "isolamento"
     COMPOUND_UPPER = "compound upper"
