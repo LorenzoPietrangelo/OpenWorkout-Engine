@@ -36,7 +36,8 @@ def voce(e, serie, livello):
 
 def info_esercizio(e):
     return InfoEsercizio(nome=e.nome, muscoli_primari=e.muscoli_primari,
-                         muscoli_secondari=e.muscoli_secondari, categoria=e.categoria,
+                         muscoli_secondari=e.muscoli_secondari, regioni=e.regioni,
+                         categoria=e.categoria,
                          attrezzi=e.attrezzi, monolaterale=e.monolaterale)
 
 def catalogo_esercizi():

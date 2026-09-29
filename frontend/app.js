@@ -11,7 +11,28 @@ const NOMI_MUSCOLI = {
   "hamstrings": "Femorali",
   "glutes": "Glutei",
   "adductors": "Adduttori",
+  "sternocostali": "Petto · sternocostali",
+  "clavicolari": "Petto · clavicolari",
+  "iliaci": "Dorsali · iliaci",
+  "toracici": "Dorsali · toracici",
+  "bicipite brachiale": "Bicipiti · bicipite brachiale",
+  "brachioradiale": "Bicipiti · brachioradiale",
+  "tricipite brachiale": "Tricipiti · tricipite brachiale",
+  "capi monoarticolari del tricipite brachiale": "Tricipiti · capi monoarticolari",
+  "grande gluteo": "Glutei · grande gluteo",
+  "medio gluteo": "Glutei · medio gluteo",
 };
+
+// con il livello avanzato questi muscoli si allenano per regioni, uguale a exercise_model.py
+const REGIONI = {
+  "chest": ["sternocostali", "clavicolari"],
+  "lats": ["iliaci", "toracici"],
+  "biceps": ["bicipite brachiale", "brachioradiale"],
+  "triceps": ["tricipite brachiale", "capi monoarticolari del tricipite brachiale"],
+  "glutes": ["grande gluteo", "medio gluteo"],
+};
+const PADRE = Object.fromEntries(Object.entries(REGIONI)
+  .flatMap(([muscolo, regioni]) => regioni.map((r) => [r, muscolo])));
 
 // ordine iniziale proposto, uguale a main.py
 const PRIORITA_INIZIALE = ["chest", "lats", "upper back", "quads", "hamstrings",
@@ -24,6 +45,7 @@ const stato = {
   giorni: new Set(GIORNI_INIZIALI),
   muscoli: [],               // [{ valore, attivo }] nell'ordine di priorità
   attrezzi: new Set(),
+  avanzato: false,           // se la lista dei muscoli contiene le regioni
   ultimaRichiesta: null,
 };
 
@@ -234,6 +256,31 @@ function disegnaAttrezzi(attrezzi) {
   })));
 }
 
+const livelloScelto = () => document.querySelector('input[name="livello"]:checked').value;
+
+// passando ad avanzato ogni muscolo viene sostituito dalle sue regioni nella stessa posizione;
+// tornando indietro le regioni si ricompongono nel muscolo, al posto della regione più in alto
+function applicaLivello() {
+  const avanzato = livelloScelto() === "avanzato";
+  if (avanzato === stato.avanzato) return;
+  stato.avanzato = avanzato;
+  if (avanzato) {
+    stato.muscoli = stato.muscoli.flatMap((m) =>
+      (REGIONI[m.valore] ?? [m.valore]).map((valore) => ({ valore, attivo: m.attivo })));
+  } else {
+    const ricomposti = new Map();
+    for (const m of stato.muscoli) {
+      const valore = PADRE[m.valore] ?? m.valore;
+      const gia = ricomposti.get(valore);
+      if (gia) gia.attivo ||= m.attivo;
+      else ricomposti.set(valore, { valore, attivo: m.attivo });
+    }
+    stato.muscoli = [...ricomposti.values()];
+  }
+  stato.muscoli = compatta(stato.muscoli);
+  disegnaMuscoli();
+}
+
 async function caricaCatalogo() {
   const [muscoli, attrezzi] = await Promise.all([
     chiama("/muscoli").then((r) => r.json()),
@@ -242,6 +289,8 @@ async function caricaCatalogo() {
   const ordinati = [...PRIORITA_INIZIALE.filter((m) => muscoli.includes(m)),
                     ...muscoli.filter((m) => !PRIORITA_INIZIALE.includes(m))];
   stato.muscoli = ordinati.map((valore) => ({ valore, attivo: true }));
+  stato.avanzato = false;
+  applicaLivello();  // il browser può aver ripristinato la scelta del livello dopo un ricaricamento
   disegnaMuscoli();
   disegnaAttrezzi(attrezzi);
 }
@@ -257,7 +306,7 @@ function leggiRichiesta() {
     attrezzi_disponibili: $("tutti-attrezzi").checked ? null : [...stato.attrezzi],
     superserie: $("superserie").checked,
     monolaterali: $("monolaterali").checked,
-    livello: document.querySelector('input[name="livello"]:checked').value,
+    livello: livelloScelto(),
   };
 }
 
@@ -386,4 +435,5 @@ disegnaGiorni();
 $("tutti-attrezzi").addEventListener("change", (e) => { $("attrezzi").hidden = e.target.checked; });
 $("form").addEventListener("submit", genera);
 $("scarica-csv").addEventListener("click", scaricaCsv);
+document.querySelectorAll('input[name="livello"]').forEach((r) => r.addEventListener("change", applicaLivello));
 caricaCatalogo().catch((e) => mostraErrore(`Impossibile caricare i dati: ${e.message}`));

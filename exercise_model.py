@@ -26,6 +26,30 @@ class Muscolo(Enum):
     ADDUCTORS = "adductors"
 
 
+# regioni muscolari, usate solo dal livello avanzato al posto del muscolo intero
+class Regione(Enum):
+    STERNOCOSTALI = "sternocostali"
+    CLAVICOLARI = "clavicolari"
+    ILIACI = "iliaci"
+    TORACICI = "toracici"
+    BICIPITE_BRACHIALE = "bicipite brachiale"
+    BRACHIORADIALE = "brachioradiale"
+    TRICIPITE_BRACHIALE = "tricipite brachiale"
+    CAPI_MONOARTICOLARI = "capi monoarticolari del tricipite brachiale"
+    GRANDE_GLUTEO = "grande gluteo"
+    MEDIO_GLUTEO = "medio gluteo"
+
+
+REGIONI = {
+    Muscolo.CHEST: [Regione.STERNOCOSTALI, Regione.CLAVICOLARI],
+    Muscolo.LATS: [Regione.ILIACI, Regione.TORACICI],
+    Muscolo.BICEPS: [Regione.BICIPITE_BRACHIALE, Regione.BRACHIORADIALE],
+    Muscolo.TRICEPS: [Regione.TRICIPITE_BRACHIALE, Regione.CAPI_MONOARTICOLARI],
+    Muscolo.GLUTES: [Regione.GRANDE_GLUTEO, Regione.MEDIO_GLUTEO],
+}
+PADRE = {r: m for m, regioni in REGIONI.items() for r in regioni}
+
+
 class Attrezzo(Enum):
     MANUBRI = "manubri"
     BILANCIERE = "bilanciere"
@@ -36,6 +60,7 @@ class Attrezzo(Enum):
     MACCHINA_LEG_CURL = "macchina leg curl"
     MACCHINA_LEG_PRESS = "macchina leg press"
     MACCHINA_ADDUTTORI = "macchina adduttori"
+    MACCHINA_ABDUTTORI = "macchina abduttori"
     MULTIPOWER = "multipower"
     LAT_MACHINE = "lat machine"
     TBAR = "t-bar"
@@ -49,6 +74,7 @@ class Esercizio:
     tempo_riscaldamento: int
     tempo_serie: int
     muscoli_secondari: list[Muscolo] = field(default_factory=list)
+    regioni: list[Regione] = field(default_factory=list)  # cosa allena per il livello avanzato
     monolaterale: bool = False
     attrezzi: list[Attrezzo] = field(default_factory=list)  # lista vuota = corpo libero
 
@@ -83,7 +109,7 @@ class SuperSerie:
 @dataclass(frozen=True)
 class MuscoloScoperto:
     """Segnaposto: nessun esercizio eseguibile con gli attrezzi disponibili."""
-    muscolo: Muscolo
+    muscolo: Muscolo | Regione
     tempo_riscaldamento: int = 0
     tempo_serie: int = 0
 

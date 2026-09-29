@@ -1,6 +1,6 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
-from exercise_model import Muscolo, Attrezzo, Categoria, Livello
+from exercise_model import Muscolo, Attrezzo, Categoria, Livello, Regione, REGIONI
 
 
 #modelli di input
@@ -9,11 +9,12 @@ class RichiestaScheda(BaseModel):
     giorni: list[int] = Field(min_length=1, max_length=7,
                               description="Giorni di allenamento (1 = lunedì, 7 = domenica)",
                               examples=[[1, 2, 4, 5, 6]])
-    priorita_muscoli: list[Muscolo] = Field(min_length=1,
-                                            description="Muscoli in ordine di priorità",
-                                            examples=[["chest", "lats", "upper back", "quads",
-                                                       "hamstrings", "side delts", "triceps",
-                                                       "biceps", "glutes", "adductors"]])
+    priorita_muscoli: list[Muscolo | Regione] = Field(
+        min_length=1,
+        description="Muscoli in ordine di priorità; con il livello avanzato chest, lats, biceps, "
+                    "triceps e glutes vanno indicati tramite le loro regioni",
+        examples=[["chest", "lats", "upper back", "quads", "hamstrings", "side delts",
+                   "triceps", "biceps", "glutes", "adductors"]])
     max_minuti: int = Field(gt=0, description="Durata massima di ogni allenamento in minuti",
                             examples=[60])
     attrezzi_disponibili: list[Attrezzo] | None = Field(
@@ -44,6 +45,17 @@ class RichiestaScheda(BaseModel):
             raise ValueError("i muscoli non possono ripetersi")
         return muscoli
 
+    @model_validator(mode="after")
+    def regioni_per_livello(self):
+        if self.livello == Livello.AVANZATO:
+            interi = [m.value for m in self.priorita_muscoli if m in REGIONI]
+            if interi:
+                raise ValueError("con il livello avanzato questi muscoli vanno indicati tramite "
+                                 f"le loro regioni: {', '.join(interi)}")
+        elif any(isinstance(m, Regione) for m in self.priorita_muscoli):
+            raise ValueError("le regioni muscolari sono disponibili solo con il livello avanzato")
+        return self
+
 
 #modelli di output
 
@@ -63,7 +75,7 @@ class VoceEsercizio(BaseModel):
 
 class Giorno(BaseModel):
     giorno: int
-    muscoli: list[Muscolo]
+    muscoli: list[Muscolo | Regione]
     durata_minuti: float
     supera_limite: bool
     esercizi: list[VoceEsercizio]
@@ -78,6 +90,7 @@ class InfoEsercizio(BaseModel):
     nome: str
     muscoli_primari: list[Muscolo]
     muscoli_secondari: list[Muscolo]
+    regioni: list[Regione]
     categoria: Categoria
     attrezzi: list[Attrezzo]
     monolaterale: bool

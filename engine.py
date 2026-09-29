@@ -2,7 +2,8 @@
 import csv
 from collections import Counter
 from itertools import combinations
-from exercise_model import Esercizio, Categoria, Muscolo, Attrezzo, MuscoloScoperto, SuperSerie, Livello
+from exercise_model import (Esercizio, Categoria, Muscolo, Attrezzo, MuscoloScoperto, SuperSerie, Livello,
+                            Regione, REGIONI, PADRE)
 from execises import esercizi
 
 MIN_REST = 2
@@ -39,13 +40,21 @@ INTESTAZIONE = ["esercizio", "serie", "ripetizioni", "recupero", "rir"]
 
 
 #insieme di metodi che generano la seettimana con i muscoli ordianti
-def valid_combos(days, n):
-    return [c for c in combinations(sorted(days), n)
-            if all(b - a >= MIN_REST for a, b in zip(c, c[1:]))
-            and (n == 1 or 7 - c[-1] + c[0] >= MIN_REST)]
+def rispetta_recupero(giorni):
+    return (all(b - a >= MIN_REST for a, b in zip(giorni, giorni[1:]))
+            and (len(giorni) == 1 or 7 - giorni[-1] + giorni[0] >= MIN_REST))
 
-def best_combo(days, n, week):
-    return min(valid_combos(days, n),
+# occupati = giorni delle regioni sorelle: lo stesso giorno va bene, quelli consecutivi no
+def valid_combos(days, n, occupati=()):
+    return [c for c in combinations(sorted(days), n)
+            if rispetta_recupero(sorted(set(c) | set(occupati)))]
+
+def giorni_sorelle(m, week):
+    sorelle = REGIONI.get(PADRE.get(m), [])
+    return {g for g, muscoli in week.items() if any(s in muscoli for s in sorelle)}
+
+def best_combo(days, n, week, occupati=()):
+    return min(valid_combos(days, n, occupati),
                key=lambda c: (max(len(week[g]) for g in c), sum(len(week[g]) for g in c)),
                default=None)
 
@@ -59,7 +68,8 @@ def coppia_preferibile(c2, c3, week):
 def build_week(days, muscles):
     week = {g: [] for g in days}
     for m in muscles:
-        c3, c2 = best_combo(days, 3, week), best_combo(days, 2, week)
+        occupati = giorni_sorelle(m, week)
+        c3, c2 = best_combo(days, 3, week, occupati), best_combo(days, 2, week, occupati)
         combo = c3 or c2
         if c3 and c2 and coppia_preferibile(c2, c3, week):
             combo = c2
@@ -75,17 +85,27 @@ def scoperto(e):
 def eseguibile(e, attrezzi):
     return attrezzi is None or set(e.attrezzi) <= set(attrezzi)
 
+# cosa allena un esercizio: i muscoli primari, oppure (per le regioni del livello avanzato)
+# le sue regioni più i primari che non hanno regioni
+def copertura(e, regionale):
+    if not regionale:
+        return set(e.muscoli_primari)
+    return set(e.regioni) | {m for m in e.muscoli_primari if m not in REGIONI}
+
 def esercizio_per(muscolo, esercizi, attrezzi=None):
+    regionale = isinstance(muscolo, Regione)
     return next((e for e in esercizi
-                 if muscolo in e.muscoli_primari and eseguibile(e, attrezzi)), None)
+                 if muscolo in copertura(e, regionale) and eseguibile(e, attrezzi)), None)
 
 def isolamento_per(muscolo, esercizi, attrezzi=None):
+    regionale = isinstance(muscolo, Regione)
     return next((e for e in esercizi
-                 if e.muscoli_primari == [muscolo] and eseguibile(e, attrezzi)), None)
+                 if copertura(e, regionale) == {muscolo} and eseguibile(e, attrezzi)), None)
 
-def compound_glutei_adduttori(secondario, esercizi, attrezzi=None):
+def compound_glutei_adduttori(gluteo, secondario, esercizi, attrezzi=None):
+    regionale = isinstance(gluteo, Regione)
     return next((e for e in esercizi
-                 if set(e.muscoli_primari) == {Muscolo.GLUTES, Muscolo.ADDUCTORS}
+                 if copertura(e, regionale) == {gluteo, Muscolo.ADDUCTORS}
                  and secondario in e.muscoli_secondari
                  and eseguibile(e, attrezzi)), None)
 
@@ -110,18 +130,20 @@ def oppure_scoperto(e, muscolo):
 
 def assegna_esercizi(week, priorita, esercizi, attrezzi=None):
     esercizi = [e for e in esercizi if not e.monolaterale]
-    gambe_speciali = (Muscolo.GLUTES, Muscolo.ADDUCTORS)
+    # per il livello avanzato il compound copre solo il grande gluteo, il medio resta un muscolo normale
+    gluteo = Regione.GRANDE_GLUTEO if Regione.GRANDE_GLUTEO in priorita else Muscolo.GLUTES
+    gambe_speciali = (gluteo, Muscolo.ADDUCTORS)
     base = {m: esercizio_per(m, esercizi, attrezzi)
             for m in priorita if m not in gambe_speciali}
     risultato = {}
     for giorno, muscoli in week.items():
         compound, slot = None, None
         if all(m in muscoli for m in gambe_speciali):
-            i_g, i_a = muscoli.index(Muscolo.GLUTES), muscoli.index(Muscolo.ADDUCTORS)
+            i_g, i_a = muscoli.index(gluteo), muscoli.index(Muscolo.ADDUCTORS)
             if min(i_g, i_a) >= TOP_SLOT:
                 secondario = scegli_secondario(giorno, week, priorita)
                 if secondario:
-                    compound = compound_glutei_adduttori(secondario, esercizi, attrezzi)
+                    compound = compound_glutei_adduttori(gluteo, secondario, esercizi, attrezzi)
                     slot = max(i_g, i_a)
         workout = []
         for i, m in enumerate(muscoli):
@@ -173,14 +195,27 @@ def isolamenti_liberi(workout):
     return [i for i, e in enumerate(workout)
             if isinstance(e, Esercizio) and e.categoria == Categoria.ISOLAMENTO]
 
+def muscoli_allenati(e):
+    return set(e.muscoli_primari) | {PADRE[r] for r in e.regioni}
+
+# l'isolamento più in basso con il primo sopra di lui che non allena lo stesso muscolo
+def coppia_superserie(workout):
+    liberi = isolamenti_liberi(workout)
+    for j in range(len(liberi) - 1, 0, -1):
+        basso = liberi[j]
+        for alto in reversed(liberi[:j]):
+            if not muscoli_allenati(workout[alto]) & muscoli_allenati(workout[basso]):
+                return alto, basso
+    return None
+
 def unisci_isolamenti(workout):
-    alto, basso = isolamenti_liberi(workout)[-2:]
+    alto, basso = coppia_superserie(workout)
     workout[alto] = SuperSerie(workout[alto], workout.pop(basso))
 
 def forma_superserie(scheda, max_minuti, livello):
     scheda = {g: list(w) for g, w in scheda.items()}
     while (g := giorno_peggiore(scheda, max_minuti, livello,
-                                lambda w: len(isolamenti_liberi(w)) >= 2)) is not None:
+                                lambda w: coppia_superserie(w) is not None)) is not None:
         unisci_isolamenti(scheda[g])
     return scheda
 
@@ -212,6 +247,7 @@ def variante_monolaterale(e, esercizi):
                  if x.monolaterale
                  and set(x.muscoli_primari) == set(e.muscoli_primari)
                  and set(x.muscoli_secondari) == set(e.muscoli_secondari)
+                 and set(x.regioni) == set(e.regioni)
                  and x.categoria == e.categoria
                  and set(x.attrezzi) == set(e.attrezzi)), None)
 

@@ -65,11 +65,11 @@ uvicorn api_wrapper.app:app --reload
 | **Available equipment** | The equipment you have. Leave it empty (`None` / `null`) to assume a fully equipped gym |
 | **Supersets** | Whether you are willing to do [supersets](#supersets) when time is short. Off by default |
 | **Unilateral exercises** | Whether you want [unilateral variants](#unilateral-exercises) when there is time left. Off by default |
-| **Experience level** | Beginner, intermediate or advanced. It sets reps, rest and RIR (see [Output](#output)). Beginner by default |
+| **Experience level** | Beginner, intermediate or advanced. It sets reps, rest and RIR (see [Output](#output)). Advanced lifters train some muscles by [region](#muscle-regions-advanced). Beginner by default |
 
-Supported muscles: `chest`, `lats`, `upper back`, `side delts`, `triceps`, `biceps`, `quads`, `hamstrings`, `glutes`, `adductors`.
+Supported muscles: `chest`, `lats`, `upper back`, `side delts`, `triceps`, `biceps`, `quads`, `hamstrings`, `glutes`, `adductors`. With the advanced level, five of them are replaced by their [regions](#muscle-regions-advanced).
 
-Supported equipment: dumbbells, barbell, bench, cables, pec fly machine, leg extension, leg curl, leg press, adductor machine, smith machine, lat machine, T-bar. The exact identifiers are listed by `GET /attrezzi`.
+Supported equipment: dumbbells, barbell, bench, cables, pec fly machine, leg extension, leg curl, leg press, adductor machine, abductor machine, smith machine, lat machine, T-bar. The exact identifiers are listed by `GET /attrezzi`.
 
 ---
 
@@ -98,9 +98,9 @@ If no exercise can be performed with the available equipment, the muscle still a
 
 The engine follows these rules:
 
-- **48-hour recovery.** A muscle is never trained on two consecutive days. This also applies across the week boundary (Sunday → Monday).
+- **48-hour recovery.** A muscle is never trained on two consecutive days. This also applies across the week boundary (Sunday → Monday), and to the [regions](#muscle-regions-advanced) of the same muscle.
 - **Frequency.** Every muscle is trained **2 or 3 times per week**. The engine tries for 3 whenever possible.
-- **One exercise per muscle.** Each muscle gets one exercise, which is repeated on every day that muscle is trained. Glutes and adductors are the only exception (see below).
+- **One exercise per muscle.** Each muscle (or region) gets one exercise, which is repeated on every day that muscle is trained. Glutes and adductors are the only exception (see below).
 - **One set as a baseline.** Every exercise starts with one set. More sets are added only if the time allows it.
 
 ### Glutes and adductors
@@ -114,11 +114,30 @@ Glutes and adductors can be trained with isolation exercises (hip thrust, adduct
    - if **neither** is trained that day, the engine picks the one with higher overall priority, as long as it is not trained the day before or the day after (to respect recovery).
    - if both quads and hamstrings are trained the day before or the day after, the compound is skipped and glutes and adductors fall back to isolation exercises.
 
+With the advanced level, the same rules apply to **gluteus maximus** and adductors: the compound covers only the gluteus maximus. The gluteus medius is a normal muscle and always gets its own isolation exercise.
+
+### Muscle regions (advanced)
+
+With the advanced level, five muscles are trained by region instead of as a whole:
+
+| Muscle | Regions |
+|---|---|
+| `chest` | `sternocostali`, `clavicolari` |
+| `lats` | `iliaci`, `toracici` |
+| `biceps` | `bicipite brachiale`, `brachioradiale` |
+| `triceps` | `tricipite brachiale`, `capi monoarticolari del tricipite brachiale` |
+| `glutes` | `grande gluteo`, `medio gluteo` |
+
+- **Regions are mandatory.** With the advanced level these five muscles must be given as regions; with the other levels regions are not accepted.
+- **Free ordering.** Each region has its own place in the priority list and is placed like a separate muscle, so two regions of the same muscle can end up in different slots of a workout.
+- **Shared recovery.** Regions of the same muscle can be trained on the same day, but never on consecutive days: all the days on which any region of a muscle is trained must respect the 48-hour rule, as if they were the same muscle.
+- **Own exercise.** Each region gets its own exercise, so time cuts and supersets work on regions like on any other muscle.
+
 ### Supersets
 
 A superset is two isolation exercises performed back to back, with a single rest at the end. Supersets are optional: they are used only if you enable them and only when a session does not fit the time limit even with one set per exercise.
 
-- **Which exercises.** Only isolation exercises can be paired, and each exercise can be in at most one superset. The engine pairs the **two lowest isolation exercises** in the workout, even if other exercises sit between them.
+- **Which exercises.** Only isolation exercises that train **different muscles** can be paired (two regions of the same muscle count as the same muscle), and each exercise can be in at most one superset. The engine takes the **lowest isolation exercise** in the workout and pairs it with the first isolation exercise above it that trains a different muscle, even if other exercises sit between them.
 - **Position.** The superset takes the **higher slot** of the two. The first exercise of the superset is the one that was higher in the workout.
 - **Timing.** Warm-up and set duration do not change: they are the sum of the two exercises. Rest changes: there is **one rest per round**, equal to the longer rest of the two exercises **plus 30 seconds** to move from one exercise to the other. For example, with intermediate values, a round costs 5.5 min instead of 8 min for the two exercises done separately.
 - **Sets.** Both exercises in a superset always get the same number of sets.
@@ -127,7 +146,7 @@ A superset is two isolation exercises performed back to back, with a single rest
 
 A unilateral exercise works one side at a time (e.g. single leg extension instead of leg extension). Unilateral variants are optional: they are used only if you enable them and only when a session has time left with one set per exercise.
 
-- **Which variant.** The unilateral variant of an exercise is the one with `monolaterale=True` and the same primary muscles, secondary muscles, category and equipment. Exercises without a variant stay as they are.
+- **Which variant.** The unilateral variant of an exercise is the one with `monolaterale=True` and the same primary muscles, secondary muscles, regions, category and equipment. Exercises without a variant stay as they are.
 - **Timing.** Each side is treated as a normal set, with its own rest. A unilateral set therefore costs **twice** a normal set.
 - **Selection.** Unilateral variants are never picked as the base exercise for a muscle: they only replace an exercise when there is time left.
 
@@ -147,7 +166,7 @@ Muscles already placed are never moved, so higher-priority muscles always keep t
 
 ### 2. Assigning exercises
 
-Each muscle is replaced with an exercise from the catalogue that targets it as a primary muscle and can be performed with the available equipment. Glutes and adductors follow the [dedicated rules](#glutes-and-adductors).
+Each muscle is replaced with an exercise from the catalogue that targets it as a primary muscle (or, for a region, lists it in its regions) and can be performed with the available equipment. Glutes and adductors follow the [dedicated rules](#glutes-and-adductors).
 
 ### 3. Fitting the time limit
 
@@ -160,7 +179,7 @@ The duration of a session is estimated as:
 
 **If a session is too long** (it exceeds the limit even with one set per exercise), the engine reduces it in two steps. Both steps work the same way: they always act on the day that exceeds the limit the most, make one change, recalculate and repeat.
 
-1. **Supersets** (only if enabled). On the worst day that still has two free isolation exercises, the two lowest are merged into a [superset](#supersets). This repeats until every day fits, or until no day has two free isolation exercises left. It does not remove any exercise, so weekly volume is kept.
+1. **Supersets** (only if enabled). On the worst day that still has two free isolation exercises of different muscles, they are merged into a [superset](#supersets). This repeats until every day fits, or until no day has such a pair left. It does not remove any exercise, so weekly volume is kept.
 2. **Removing exercises.** On the worst day, the engine removes the lowest exercise that is trained 3 times a week (bringing it down to 2). This repeats until every day fits, or until no exercise trained 3 times a week is left.
    - If the lowest removable item is a superset, only one of its two exercises is removed: the one trained 3 times a week, or the lower one if both are. The other exercise becomes a normal exercise again and goes back to its **original slot**.
 
@@ -206,7 +225,7 @@ POST /scheda
 | Field | Meaning |
 |---|---|
 | `giorni` | Training days (1 = Monday … 7 = Sunday) |
-| `priorita_muscoli` | Muscles in priority order |
+| `priorita_muscoli` | Muscles in priority order. With `livello: "avanzato"`, chest, lats, biceps, triceps and glutes must be given as [regions](#muscle-regions-advanced) |
 | `max_minuti` | Max session length in minutes |
 | `attrezzi_disponibili` | Available equipment, `null` = everything |
 | `superserie` | `true` to allow [supersets](#supersets) when time is short. Optional, default `false` |
@@ -258,6 +277,7 @@ Esercizio(
     [Muscolo.GLUTES, Muscolo.ADDUCTORS],          # primary muscles
     Categoria.COMPOUND_GAMBE,                     # category: ISOLAMENTO, COMPOUND_UPPER, COMPOUND_GAMBE
     muscoli_secondari=[Muscolo.QUADS],            # secondary muscles
+    regioni=[Regione.GRANDE_GLUTEO],              # regions it trains, for the advanced level
     tempo_riscaldamento=5,                        # warm-up time (min)
     tempo_serie=1,                                # duration of one set (min)
     monolaterale=False,                           # True for a unilateral variant
@@ -265,7 +285,9 @@ Esercizio(
 ),
 ```
 
-To add a unilateral variant, add a second exercise with `monolaterale=True` and the same muscles, category and equipment as the original.
+Primary muscles and regions are independent: an exercise is used for a whole muscle (beginner and intermediate) only if the muscle is in its primary muscles, and for a region (advanced) only if the region is in its regions. For example, a hip abduction has no primary muscles and `regioni=[Regione.MEDIO_GLUTEO]`: it is never chosen as the glute exercise for a beginner, because it does not train the whole muscle.
+
+To add a unilateral variant, add a second exercise with `monolaterale=True` and the same muscles, regions, category and equipment as the original.
 
 When several exercises fit the same muscle and equipment, the engine picks the **first one in the list**, so order matters.
 
@@ -280,7 +302,6 @@ When several exercises fit the same muscle and equipment, the engine picks the *
 
 ## Roadmap
 
-- **Muscle regions for advanced lifters.** Advanced lifters will be able to target different regions of the same muscle (e.g. upper and lower chest). Regions will be treated as one muscle for placement, so they are always trained in the same session.
 - **Full Body A/B split.** Two alternating workouts in a rolling cycle, e.g. with 3 sessions per week: week 1 `A → B → A`, week 2 `B → A → B`.
 - Separate *priority* and *non-priority* muscle lists.
 - Clear feedback when the selected days cannot produce a valid program.
