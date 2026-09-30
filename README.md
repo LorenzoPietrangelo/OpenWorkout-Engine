@@ -303,8 +303,6 @@ When several exercises fit the same muscle and equipment, the engine picks the *
 ## Roadmap
 
 - **Full Body A/B split.** Two alternating workouts in a rolling cycle, e.g. with 3 sessions per week: week 1 `A → B → A`, week 2 `B → A → B`.
-- Separate *priority* and *non-priority* muscle lists.
-- Clear feedback when the selected days cannot produce a valid program.
 - A larger exercise catalogue.
 
 ---
